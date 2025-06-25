@@ -43,15 +43,19 @@ def scrape_webpage_simple(url):
 class CoverLetterBuilder:
 
     def __init__(self):
+
+        # AI models 
         self.openai = OpenAI()
         self.creator_model = "gpt-4o"
         self.evaluator_model = "o4-mini"
+
+
+
         with open("../about/summary.txt", "r", encoding="utf-8") as f:
             summary = f.read()
 
         with open("../about/cover_letter_template.txt", "r", encoding="utf-8") as f:
             cover_letter_template = f.read()
-
 
         reader = PdfReader("../about/resume.pdf")
         resume = ""
@@ -60,9 +64,12 @@ class CoverLetterBuilder:
             text = page.extract_text()
             if text:
                 resume += text
+
+        # Your name goes here
         name = "Charles McTurland"
 
 
+        # System prompt - Tweak it for the best results. 
         self.system_prompt = f"""You are a proffesional cover letter writer, and your job is to write a cover letter for {name}, highlighting {name}'s skills, experience, and achievements. 
 particularly questions related to {name}'s career, background, skills and experience. 
 Your responsibility is to represent {name} in the letter as faithfully as possible. 
@@ -81,7 +88,7 @@ You have to listen to the feedback, and improve your cover letter accordingly to
 
         self.updated_system_prompt = self.system_prompt
 
-
+        # Evaluator prompt - Tweak it for the best results. 
         self.evaluator_system_prompt = f"""
 You are a professional evaluator that decides whether a cover letter is acceptable. 
 You are provided with {name}'s summary and resume, an example of a cover letter from {name}, the job description, and the cover letter. 
@@ -95,8 +102,10 @@ Here's the information:
 With this context, please evaluate the cover letter, replying with whether the cover letter is acceptable and your feedback.
 """
         
+        # UI 
         gr.ChatInterface(self.requestLetter, type="messages").launch()
         
+
 
     @staticmethod
     def evaluator_cover_letter(job_post, cover_letter):
@@ -147,8 +156,11 @@ With this context, please evaluate the cover letter, replying with whether the c
 
         cover_letter = self.run(self.system_prompt, job_posting)
 
+        # evalion limit - you can limit it to avoid expences
+        eval_limit = 10
+
         eval_counter = 0
-        while eval_counter < 10:
+        while eval_counter < eval_limit:
             evaluation = self.evaluate(job_posting, cover_letter)
             if evaluation.is_acceptable:
                 print("Passed evaluation - returning reply")
@@ -166,5 +178,8 @@ With this context, please evaluate the cover letter, replying with whether the c
         print("Failed evaluation - returning reply")
         return "Unable to generate cover letter" +"\n" + evaluation.feedback    
 
+
+
+# runs the code
 if __name__ == "__main__":
     CoverLetterBuilder()    
