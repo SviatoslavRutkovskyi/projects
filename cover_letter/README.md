@@ -2,7 +2,7 @@
 
 This is a tool to help you create cover letters. It uses Agentic AI patterns, such as an evaluator optimizer, to ensure the quality of the AI generated output.
 
-The app uses information in the about folder, so if you want to have the best output, input your personal infomation instead of the provided examples. You can also replace the example name with your own name.
+The app uses information in the about folder, so if you want to have the best output, input your personal infomation instead of the provided examples. You should also replace the example name with your own name.
 
 To use the programm, navigate to this folder using command "cd cover_letter",
 and run the following command: uv run cover_letter_builder.py

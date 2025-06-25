@@ -51,13 +51,13 @@ class CoverLetterBuilder:
 
 
 
-        with open("../about/summary.txt", "r", encoding="utf-8") as f:
+        with open("about/summary.txt", "r", encoding="utf-8") as f:
             summary = f.read()
 
-        with open("../about/cover_letter_template.txt", "r", encoding="utf-8") as f:
+        with open("about/cover_letter_template.txt", "r", encoding="utf-8") as f:
             cover_letter_template = f.read()
 
-        reader = PdfReader("../about/resume.pdf")
+        reader = PdfReader("about/resume.pdf")
         resume = ""
 
         for page in reader.pages:
@@ -133,7 +133,7 @@ With this context, please evaluate the cover letter, replying with whether the c
         ]
         response = self.openai.responses.parse(
             model=self.evaluator_model,
-            reasoning = {"effort":"high"},
+            reasoning = {"effort":"medium"},
             input=messages,
             text_format = Evaluation,
             )
