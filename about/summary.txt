@@ -1,0 +1,7 @@
+As a passionate and experienced software engineer based in New York City, I’ve spent over a decade building scalable, high-impact web applications that improve user experience and drive business results. After earning my B.S. in Computer Science from the University of Pittsburgh, I began my career at MarketSmart, where I dove deep into API development and automation. Since 2015, I’ve been part of the engineering team at Embark, where I’ve helped lead the transformation of a legacy web application into a high-performing single-page app—contributing directly to a $1.4M annual revenue boost.
+
+I thrive in collaborative environments and enjoy working closely with product managers, designers, and fellow engineers to build intuitive, responsive, and reliable systems. Whether I’m optimizing performance for 35M+ users, designing internal tools, or mentoring junior engineers, I bring a strong sense of ownership and a love for clean, maintainable code.
+
+My technical toolkit includes Python (Django), JavaScript (React, Node.js), SQL/NoSQL databases, and cloud infrastructure with AWS. I’m always looking to deepen my knowledge and stay sharp—recently, I even built a poker simulation app combining machine learning and real-time visualizations, just for fun.
+
+For me, software engineering is as much about creativity and problem-solving as it is about code—and I’m excited to keep building things that make a difference.

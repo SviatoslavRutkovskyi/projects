@@ -5,7 +5,6 @@ import gradio as gr
 from pydantic import BaseModel
 import requests
 from bs4 import BeautifulSoup
-from IPython.display import Markdown, display
 
 load_dotenv(override=True)
 
@@ -47,21 +46,21 @@ class CoverLetterBuilder:
         self.openai = OpenAI()
         self.creator_model = "gpt-4o"
         self.evaluator_model = "o4-mini"
-        with open("../me/summary.txt", "r", encoding="utf-8") as f:
+        with open("../about/summary.txt", "r", encoding="utf-8") as f:
             summary = f.read()
 
-        with open("../me/cover_letter_template.txt", "r", encoding="utf-8") as f:
+        with open("../about/cover_letter_template.txt", "r", encoding="utf-8") as f:
             cover_letter_template = f.read()
 
 
-        reader = PdfReader("../me/resume.pdf")
+        reader = PdfReader("../about/resume.pdf")
         resume = ""
 
         for page in reader.pages:
             text = page.extract_text()
             if text:
                 resume += text
-        name = "Sviatoslav Rutkovskyi"
+        name = "Charles McTurland"
 
 
         self.system_prompt = f"""You are a proffesional cover letter writer, and your job is to write a cover letter for {name}, highlighting {name}'s skills, experience, and achievements. 

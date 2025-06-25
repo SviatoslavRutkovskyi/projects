@@ -1,0 +1,14 @@
+Dear Hiring Manager,
+
+As a seasoned software engineer with over a decade of experience building scalable, data-driven applications, I’m excited to apply for a software engineering position at Microsoft. The opportunity to contribute to a company known for its innovation and impact aligns perfectly with my passion for solving complex technical challenges at scale.
+
+At Embark, where I’ve been part of the engineering team since 2015, I helped re-architect a multi-page application into a high-performing single-page app, directly boosting annual revenue by $1.4M. I’ve also built an ad-serving platform that scaled to 35 million users, increasing page speed by 15%. These projects were driven by my focus on thoughtful architecture, collaboration across teams, and clean, efficient code.
+
+I bring to the table deep experience in Python (Django), JavaScript (React/Node), and cloud technologies like AWS, along with a strong foundation in databases and RESTful API design. I thrive in environments where I can iterate quickly, partner with cross-functional teams, and constantly improve systems to meet real-world needs—values I know Microsoft shares.
+
+Outside of my professional work, I enjoy exploring projects that combine data science and web development, including a poker simulation app I built using Sci-Kit Learn and Cards.js. I’m always looking to grow and explore new tools, frameworks, and ways to make software more intuitive and impactful.
+
+I would be thrilled to bring my experience, energy, and curiosity to Microsoft, and I welcome the opportunity to discuss how I can contribute to your engineering team. Thank you for considering my application—I look forward to connecting soon.
+
+Sincerely,
+Charles McTurland
