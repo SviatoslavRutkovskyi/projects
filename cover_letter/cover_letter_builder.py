@@ -42,22 +42,36 @@ def scrape_webpage_simple(url):
 
 class CoverLetterBuilder:
 
-    def __init__(self):
+    # Can take all of the following as optional parameters.
+    # Pass in the parameters that you want to change from the default values. 
+    def __init__(self, 
+                creator_model = "gpt-4o", 
+                evaluator_model = "o4-mini", 
+                name = "Charles McTurland", 
+                eval_limit = 10,
+                summary_path = "about/summary.txt",
+                cover_letter_path = "about/cover_letter_template.txt",
+                resume_path = "about/resume.pdf",
+                system_prompt = "",
+                evaluator_prompt = ""
+                ):
+        
+        self.creator_model = creator_model
+        self.evaluator_model = evaluator_model
+        self.eval_limit = eval_limit
+        
 
         # AI models 
         self.openai = OpenAI()
-        self.creator_model = "gpt-4o"
-        self.evaluator_model = "o4-mini"
 
 
-
-        with open("about/summary.txt", "r", encoding="utf-8") as f:
+        with open(summary_path, "r", encoding="utf-8") as f:
             summary = f.read()
 
-        with open("about/cover_letter_template.txt", "r", encoding="utf-8") as f:
+        with open(cover_letter_path, "r", encoding="utf-8") as f:
             cover_letter_template = f.read()
 
-        reader = PdfReader("about/resume.pdf")
+        reader = PdfReader(resume_path)
         resume = ""
 
         for page in reader.pages:
@@ -65,12 +79,11 @@ class CoverLetterBuilder:
             if text:
                 resume += text
 
-        # Your name goes here
-        name = "Charles McTurland"
-
 
         # System prompt - Tweak it for the best results. 
-        self.system_prompt = f"""You are a proffesional cover letter writer, and your job is to write a cover letter for {name}, highlighting {name}'s skills, experience, and achievements. 
+        if (system_prompt == ""):
+            
+            self.system_prompt =  f"""You are a proffesional cover letter writer, and your job is to write a cover letter for {name}, highlighting {name}'s skills, experience, and achievements. 
 particularly questions related to {name}'s career, background, skills and experience. 
 Your responsibility is to represent {name} in the letter as faithfully as possible. 
 You are given a summary of {name}'s background and Resume which you can use in the cover letter. 
@@ -85,11 +98,15 @@ You will be evaluated, and if evalutor decides that your cover letter is not up 
 You have to listen to the feedback, and improve your cover letter accordingly to the feedback.
 \n\n## Summary:\n{summary}\n\n## Resume:\n{resume}\n\n ## Cover Letter Template:\n{cover_letter_template}\n\n
 """
+        else:
+            self.system_prompt = system_prompt
+
 
         self.updated_system_prompt = self.system_prompt
 
         # Evaluator prompt - Tweak it for the best results. 
-        self.evaluator_system_prompt = f"""
+        if (evaluator_prompt == ""):            
+            self.evaluator_system_prompt = f"""
 You are a professional evaluator that decides whether a cover letter is acceptable. 
 You are provided with {name}'s summary and resume, an example of a cover letter from {name}, the job description, and the cover letter. 
 Your task is to evaluate the cover letter, and reply with whether it is acceptable and your feedback. 
@@ -101,6 +118,8 @@ Here's the information:
 \n\n## Summary:\n{summary}\n\n## Resume:\n{resume}\n\n## Cover Letter Template:\n{cover_letter_template}\n\n
 With this context, please evaluate the cover letter, replying with whether the cover letter is acceptable and your feedback.
 """
+        else:
+            self.evaluator_system_prompt = evaluator_prompt
         
         # UI 
         gr.ChatInterface(self.requestLetter, type="messages").launch()
@@ -157,10 +176,10 @@ With this context, please evaluate the cover letter, replying with whether the c
         cover_letter = self.run(self.system_prompt, job_posting)
 
         # evalion limit - you can limit it to avoid expences
-        eval_limit = 10
+  
 
         eval_counter = 0
-        while eval_counter < eval_limit:
+        while eval_counter < self.eval_limit:
             evaluation = self.evaluate(job_posting, cover_letter)
             if evaluation.is_acceptable:
                 print("Passed evaluation - returning reply")
