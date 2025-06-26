@@ -8,6 +8,7 @@ dependencies = [
     "bs4>=0.0.2",
     "dotenv>=0.9.9",
     "gradio>=5.34.2",
+    "ipykernel>=6.29.5",
     "ipython>=9.3.0",
     "openai>=1.91.0",
     "pydantic>=2.11.7",
