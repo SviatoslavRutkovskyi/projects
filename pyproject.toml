@@ -1,7 +1,7 @@
 [project]
-name = "agents"
+name = "projects"
 version = "0.1.0"
-description = "Add your description here"
+description = "AI projects"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -15,3 +15,11 @@ dependencies = [
     "pypdf>=5.6.1",
     "requests>=2.32.4",
 ]
+
+[dependency-groups]
+dev = [
+    "projects",
+]
+
+[tool.uv.sources]
+projects = { workspace = true }

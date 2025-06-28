@@ -7,35 +7,6 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "agents"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "bs4" },
-    { name = "dotenv" },
-    { name = "gradio" },
-    { name = "ipykernel" },
-    { name = "ipython" },
-    { name = "openai" },
-    { name = "pydantic" },
-    { name = "pypdf" },
-    { name = "requests" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "bs4", specifier = ">=0.0.2" },
-    { name = "dotenv", specifier = ">=0.9.9" },
-    { name = "gradio", specifier = ">=5.34.2" },
-    { name = "ipykernel", specifier = ">=6.29.5" },
-    { name = "ipython", specifier = ">=9.3.0" },
-    { name = "openai", specifier = ">=1.91.0" },
-    { name = "pydantic", specifier = ">=2.11.7" },
-    { name = "pypdf", specifier = ">=5.6.1" },
-    { name = "requests", specifier = ">=2.32.4" },
-]
-
-[[package]]
 name = "aiofiles"
 version = "24.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -952,6 +923,43 @@ sdist = { url = "https://files.pythonhosted.org/packages/fe/8b/3c73abc9c759ecd3f
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fe/39/979e8e21520d4e47a0bbe349e2713c0aac6f3d853d0e5b34d76206c439aa/platformdirs-4.3.8-py3-none-any.whl", hash = "sha256:ff7059bb7eb1179e2685604f4aaf157cfd9535242bd23742eadc3c13542139b4", size = 18567, upload-time = "2025-05-07T22:47:40.376Z" },
 ]
+
+[[package]]
+name = "projects"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "bs4" },
+    { name = "dotenv" },
+    { name = "gradio" },
+    { name = "ipykernel" },
+    { name = "ipython" },
+    { name = "openai" },
+    { name = "pydantic" },
+    { name = "pypdf" },
+    { name = "requests" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "projects" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "bs4", specifier = ">=0.0.2" },
+    { name = "dotenv", specifier = ">=0.9.9" },
+    { name = "gradio", specifier = ">=5.34.2" },
+    { name = "ipykernel", specifier = ">=6.29.5" },
+    { name = "ipython", specifier = ">=9.3.0" },
+    { name = "openai", specifier = ">=1.91.0" },
+    { name = "pydantic", specifier = ">=2.11.7" },
+    { name = "pypdf", specifier = ">=5.6.1" },
+    { name = "requests", specifier = ">=2.32.4" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "projects", virtual = "." }]
 
 [[package]]
 name = "prompt-toolkit"

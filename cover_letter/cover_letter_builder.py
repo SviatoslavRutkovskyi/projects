@@ -42,6 +42,8 @@ def scrape_webpage_simple(url):
 
 class CoverLetterBuilder:
 
+
+
     # Can take all of the following as optional parameters.
     # Pass in the parameters that you want to change from the default values. 
     def __init__(self, 
@@ -53,36 +55,34 @@ class CoverLetterBuilder:
                 cover_letter_path = "about/cover_letter_template.txt",
                 resume_path = "about/resume.pdf",
                 system_prompt = "",
-                evaluator_prompt = ""
+                evaluator_prompt = "",
+                include_feedback = False
                 ):
         
         self.creator_model = creator_model
         self.evaluator_model = evaluator_model
         self.eval_limit = eval_limit
-        
-
+        self.include_feedback = include_feedback
+    
         # AI models 
         self.openai = OpenAI()
 
+        if (system_prompt == "" and evaluator_prompt == ""):
+            with open(summary_path, "r", encoding="utf-8") as f:
+                summary = f.read()
 
-        with open(summary_path, "r", encoding="utf-8") as f:
-            summary = f.read()
+            with open(cover_letter_path, "r", encoding="utf-8") as f:
+                cover_letter_template = f.read()
 
-        with open(cover_letter_path, "r", encoding="utf-8") as f:
-            cover_letter_template = f.read()
+            reader = PdfReader(resume_path)
+            resume = ""
 
-        reader = PdfReader(resume_path)
-        resume = ""
-
-        for page in reader.pages:
-            text = page.extract_text()
-            if text:
-                resume += text
-
-
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    resume += text
         # System prompt - Tweak it for the best results. 
         if (system_prompt == ""):
-            
             self.system_prompt =  f"""You are a proffesional cover letter writer, and your job is to write a cover letter for {name}, highlighting {name}'s skills, experience, and achievements. 
 particularly questions related to {name}'s career, background, skills and experience. 
 Your responsibility is to represent {name} in the letter as faithfully as possible. 
@@ -122,7 +122,17 @@ With this context, please evaluate the cover letter, replying with whether the c
             self.evaluator_system_prompt = evaluator_prompt
         
         # UI 
-        gr.ChatInterface(self.requestLetter, type="messages").launch()
+        with gr.Blocks(theme=gr.themes.Default(primary_hue="sky")) as ui:
+            gr.Markdown("# Cover Letter Builder")
+            with gr.Row():
+                job_post_textbox = gr.Textbox(label="Paste the job posting text or link here", lines = 20)
+                cover_letter_textbox = gr.Textbox(label="Cover Letter", lines=20)
+            
+            run_button = gr.Button("Run", variant="primary")
+            run_button.click(fn=self.requestLetter, inputs=job_post_textbox, outputs=cover_letter_textbox)
+            job_post_textbox.submit(fn=self.requestLetter, inputs=job_post_textbox, outputs=cover_letter_textbox)
+
+        ui.launch(inbrowser=True)
         
 
 
@@ -165,7 +175,7 @@ With this context, please evaluate the cover letter, replying with whether the c
         return response.choices[0].message.content
 
 
-    def requestLetter(self, job_posting, history):
+    def requestLetter(self, job_posting):
         page = scrape_webpage_simple(job_posting)
         print(page)
         if page == 'error':
@@ -176,7 +186,6 @@ With this context, please evaluate the cover letter, replying with whether the c
         cover_letter = self.run(self.system_prompt, job_posting)
 
         # evalion limit - you can limit it to avoid expences
-  
 
         eval_counter = 0
         while eval_counter < self.eval_limit:
@@ -187,6 +196,8 @@ With this context, please evaluate the cover letter, replying with whether the c
                 print(f"## Feedback:\n{evaluation.feedback}")
                 print(f"## Updated system prompt:\n{self.updated_system_prompt}")
                 self.updated_system_prompt = self.system_prompt;
+                if self.include_feedback:
+                    return cover_letter + "\n" + evaluation.feedback;
                 return cover_letter
             else:
                 eval_counter += 1
