@@ -125,7 +125,7 @@ With this context, please evaluate the cover letter, replying with whether the c
         ]
         response = self.openai.responses.parse(
             model=self.evaluator_model,
-            reasoning = {"effort":"high"},
+            reasoning = {"effort":"medium"},
             input=messages,
             text_format = Evaluation,
             )
