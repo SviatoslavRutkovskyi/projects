@@ -49,11 +49,11 @@ class CoverLetterBuilder:
     def __init__(self, 
                 creator_model = "gpt-4o", 
                 evaluator_model = "o4-mini", 
-                name = "Charles McTurland", 
+                name = "Sviatoslav Rutkovskyi", 
                 eval_limit = 10,
-                summary_path = "about/summary.txt",
-                cover_letter_path = "about/cover_letter_template.txt",
-                resume_path = "about/resume.pdf",
+                summary_path = "../me/summary.txt",
+                cover_letter_path = "../me/cover_letter_template.txt",
+                resume_path = "../me/resume.pdf",
                 system_prompt = "",
                 evaluator_prompt = "",
                 include_feedback = False
@@ -197,7 +197,7 @@ With this context, please evaluate the cover letter, replying with whether the c
                 print(f"## Updated system prompt:\n{self.updated_system_prompt}")
                 self.updated_system_prompt = self.system_prompt;
                 if self.include_feedback:
-                    return cover_letter + "\n" + evaluation.feedback;
+                    return cover_letter + "\n\n\n" + evaluation.feedback;
                 return cover_letter
             else:
                 eval_counter += 1
