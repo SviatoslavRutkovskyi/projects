@@ -1,16 +1,25 @@
 [project]
-name = "agents"
+name = "projects"
 version = "0.1.0"
-description = "Add your description here"
+description = "AI projects"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "bs4>=0.0.2",
     "dotenv>=0.9.9",
     "gradio>=5.34.2",
+    "ipykernel>=6.29.5",
     "ipython>=9.3.0",
     "openai>=1.91.0",
     "pydantic>=2.11.7",
     "pypdf>=5.6.1",
     "requests>=2.32.4",
 ]
+
+[dependency-groups]
+dev = [
+    "projects",
+]
+
+[tool.uv.sources]
+projects = { workspace = true }
