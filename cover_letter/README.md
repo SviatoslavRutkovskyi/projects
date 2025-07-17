@@ -14,10 +14,13 @@ You will be able to observe the thinking process in the console, and AI will res
 Currently, the app uses gpt-4o for the creator model, and o4-mini as the evaluator model. You can change model type if you choose to do so. Be aware, that in order for the app to run, you will have to provide a .env file with your OPENAI_API_KEY.
 
 Starting the Cover Letter Builder
+
 ![Demo 1](resources/CL_GIF_1.gif)
 
 Displaying the code
+
 ![Demo 2](resources/CL_GIF_2.gif)
 
 Showcasing the results
+
 ![Demo 3](resources/CL_GIF_3.gif)
