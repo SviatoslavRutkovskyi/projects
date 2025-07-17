@@ -12,3 +12,12 @@ Now, click on the local website, and paste in either the job description, or a w
 You will be able to observe the thinking process in the console, and AI will respond with a cover letter once it creates a cover letter that passes quality control.
 
 Currently, the app uses gpt-4o for the creator model, and o4-mini as the evaluator model. You can change model type if you choose to do so. Be aware, that in order for the app to run, you will have to provide a .env file with your OPENAI_API_KEY.
+
+Starting the Cover Letter Builder
+![Demo 1](CL_GIF_1.gif)
+
+Displaying the code
+![Demo 2](CL_GIF_2.gif)
+
+Showcasing the results
+![Demo 3](CL_GIF_3.gif)
