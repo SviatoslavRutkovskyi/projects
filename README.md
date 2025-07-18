@@ -35,7 +35,3 @@ You can create the openAI key [here](https://platform.openai.com/api-keys)
 ### 🚧 Planned Additions
 
 More projects are coming soon.
-
-```
-
-```
