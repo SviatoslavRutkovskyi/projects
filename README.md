@@ -1,10 +1,10 @@
-#Projects
+# Projects
 
 This repository hosts a collection of AI-powered projects. Currently, it contains a Cover Letter Builder, with more projects planned in the future.
 
 ## 🔧 Setup
 
-1. Install Dependencies
+### 1. Install Dependencies
 
 This project uses uv to manage dependencies.
 If you don't have it installed, you can install it [here](https://docs.astral.sh/uv/getting-started/installation/)
@@ -15,7 +15,7 @@ Then, run:
 uv sync
 ```
 
-2. Configure Environment Variables
+### 2. Configure Environment Variables
 
 Create a .env file in the root directory with your OpenAI API key:
 
