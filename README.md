@@ -1,19 +1,34 @@
 #Projects
 
-SETUP:
+This repository hosts a collection of AI-powered projects. Currently, it contains a Cover Letter Builder, with more projects planned in the future.
 
-Use uv to download nessesary packages, using command "uv sync".
-If you don't have it installed, you can install it here: https://docs.astral.sh/uv/getting-started/installation/
+## 🔧 Setup
 
-Create a .env file with a OpenAI API key, using the variable OPENAI_API_KEY.
-You can create the openAI key here: https://platform.openai.com/api-keys
+1. Install Dependencies
 
-This repo contains an about directory, which contains personal information that some projects may use to provide more context to AI. If you want to get the best results, replace the file contents with information relevant to you.
+This project uses uv to manage dependencies.
+If you don't have it installed, you can install it [here](https://docs.astral.sh/uv/getting-started/installation/)
 
-After doing that, you should be set up, and be able to use the projects.
+Then, run:
+`bash
+    uv sync
+    `
 
-PROJECTS:
+2. Configure Environment Variables
 
-Currently there is only one project, the cover letter builder, but that might change in the future.
+Create a .env file in the root directory with your OpenAI API key:
+`env
+    OPENAI_API_KEY=your_openai_key_here
+    `
+You can create the openAI key [here](https://platform.openai.com/api-keys)
 
-- Cover Letter Builder: cover_letter\README.md
+## 📁 Projects
+
+### ✅ Current Projects
+
+- [Cover Letter Builder](cover_letter/README.md):
+  An AI-powered tool that generates personalized cover letters based on your resume and job description.
+
+### 🚧 Planned Additions
+
+More projects are coming soon.
