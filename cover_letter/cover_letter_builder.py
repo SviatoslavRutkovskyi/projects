@@ -51,9 +51,9 @@ class CoverLetterBuilder:
                 evaluator_model = "o4-mini", 
                 name = "Sviatoslav Rutkovskyi", 
                 eval_limit = 10,
-                summary_path = "../me/summary.txt",
-                cover_letter_path = "../me/cover_letter_template.txt",
-                resume_path = "../me/resume.pdf",
+                summary_path = "about/summary.txt",
+                cover_letter_path = "about/cover_letter_template.txt",
+                resume_path = "about/resume.pdf",
                 system_prompt = "",
                 evaluator_prompt = "",
                 include_feedback = False
