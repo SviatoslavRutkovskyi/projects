@@ -2,6 +2,8 @@
 me/cover_letter_template.txt
 me/resume.pdf
 me/summary.txt
+resume/resources/
+resume/static/output/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

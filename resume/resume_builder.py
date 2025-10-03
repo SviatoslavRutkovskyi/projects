@@ -5,6 +5,9 @@ import gradio as gr
 from pydantic import BaseModel
 import requests
 from bs4 import BeautifulSoup
+from flask import Flask, request, send_file
+import subprocess
+import os
 
 load_dotenv(override=True)
 
@@ -15,7 +18,7 @@ class Evaluation(BaseModel):
 
 
 
-def scraped_webpage_simple(url, cache=None):
+def scrape_webpage_simple(url, cache=None):
     # Check cache first
     if cache and url in cache:
         print(f"Using cached content for {url}")
@@ -51,7 +54,7 @@ def scraped_webpage_simple(url, cache=None):
 
 
 
-class CoverLetterBuilder:
+class ResumeBuilder:
 
 
 
@@ -75,7 +78,7 @@ class CoverLetterBuilder:
         self.eval_limit = eval_limit
         self.include_feedback = include_feedback
         
-        # Cache for scraped content to avoid repeated scraping
+        # Cache for scraped content to avoid repeated scraping between request_letter and tailor_resume
         self.scraped_content_cache = {}
     
         # AI models 
@@ -134,8 +137,35 @@ With this context, please evaluate the cover letter, replying with whether the c
 """
         else:
             self.evaluator_system_prompt = evaluator_prompt
+   
+        with open("resources/resume_original.tex", "r") as f:
+            resume_tex = f.read()
+
+        with open("resources/projects.txt", "r") as f:
+            projects = f.read()
+
+        self.resume_prompt = f"""
+You are helping tailor a LaTeX resume.
+
+Here is the current LaTeX resume:
+{resume_tex}
+
+Here is the list of projects you list on the resume:
+{projects}
+
+Please:
+- Rewrite the Profile section to emphasize alignment with the job.
+- Reorder/trim the SKILLS section to highlight the most relevant ones.
+- Select the most relevant PROJECTS/EXPERIENCES and update their bullet points with job-specific keywords.
+- Return the full LaTeX code for the resume, keeping the formatting intact.
+- Make sure that the resume fills the page, but does not overflow.
+- Do not include markdown formatting, and any other text or comments.
+- Do not modify the resume outside of the sections that are specified.
+"""     
+        self.launch()
         
-        # UI 
+
+    def launch(self):
         with gr.Blocks(theme=gr.themes.Default(primary_hue="sky")) as ui:
             gr.Markdown("# Cover Letter Builder")
             with gr.Row():
@@ -143,12 +173,14 @@ With this context, please evaluate the cover letter, replying with whether the c
                 cover_letter_textbox = gr.Textbox(label="Cover Letter", lines=20)
             
             run_button = gr.Button("Run", variant="primary")
-            run_button.click(fn=self.requestLetter, inputs=job_post_textbox, outputs=cover_letter_textbox)
-            job_post_textbox.submit(fn=self.requestLetter, inputs=job_post_textbox, outputs=cover_letter_textbox)
+            run_button.click(fn=self.request_letter, inputs=job_post_textbox, outputs=cover_letter_textbox)
 
-        ui.launch(inbrowser=True)
+            resume_file = gr.File(label="Tailored Resume PDF")
+            resume_button = gr.Button("Tailor Resume", variant="primary")
+            resume_button.click(fn=self.tailor_resume, inputs=job_post_textbox, outputs=resume_file)
+            job_post_textbox.submit(fn=self.request_letter, inputs=job_post_textbox, outputs=cover_letter_textbox)
         
-
+        ui.launch(inbrowser=True)
 
     @staticmethod
     def evaluator_cover_letter(job_post, cover_letter):
@@ -189,8 +221,8 @@ With this context, please evaluate the cover letter, replying with whether the c
         return response.choices[0].message.content
 
 
-    def requestLetter(self, job_posting):
-        page = scraped_webpage_simple(job_posting, self.scraped_content_cache)
+    def request_letter(self, job_posting):
+        page = scrape_webpage_simple(job_posting, self.scraped_content_cache)
         print(page)
         if page == 'error':
             print("Failed to scrape job posting")
@@ -198,7 +230,6 @@ With this context, please evaluate the cover letter, replying with whether the c
             job_posting = page
 
         cover_letter = self.run(self.system_prompt, job_posting)
-
         # evalion limit - you can limit it to avoid expences
 
         eval_counter = 0
@@ -223,7 +254,39 @@ With this context, please evaluate the cover letter, replying with whether the c
         return "Unable to generate cover letter" +"\n" + evaluation.feedback    
 
 
+    def tailor_resume(self, job_posting):
+        page = scrape_webpage_simple(job_posting, self.scraped_content_cache)
+        print(page)
+        if page == 'error':
+            print("Failed to scrape job posting")
+        else:
+            job_posting = page
+        
+        resume = self.run(self.resume_prompt, job_posting)
+
+        output_dir = "static/output"
+        os.makedirs(output_dir, exist_ok=True)
+        tex_path = os.path.join(output_dir, "resume.tex")
+        pdf_path = tex_path.replace(".tex", ".pdf")
+
+        with open(tex_path, "w", encoding="utf-8") as f:
+            f.write(resume)
+        
+        filename = os.path.basename(tex_path)  
+
+        result = subprocess.run(
+            ["tectonic", filename],
+            cwd=output_dir,
+            capture_output=True,
+            text=True
+        )
+
+        print("Tectonic STDOUT:\n", result.stdout)
+        print("Tectonic STDERR:\n", result.stderr)
+
+        return pdf_path
+
 
 # runs the code
 if __name__ == "__main__":
-    CoverLetterBuilder()    
+    ResumeBuilder()    
