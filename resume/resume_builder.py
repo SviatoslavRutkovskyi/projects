@@ -8,6 +8,10 @@ from bs4 import BeautifulSoup
 from flask import Flask, request, send_file
 import subprocess
 import os
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 
 load_dotenv(override=True)
 
@@ -78,6 +82,9 @@ class ResumeBuilder:
         
         # Cache for scraped content to avoid repeated scraping between request_letter and tailor_resume
         self.scraped_content_cache = {}
+        
+        # Use empty.pdf for consistent file component sizing
+        self.empty_file_path = "resources/empty.pdf"
     
         # AI models 
         self.openai = OpenAI()
@@ -171,15 +178,31 @@ Please:
                 job_post_textbox = gr.Textbox(label="Paste the job posting text or link here", lines = 20)
                 cover_letter_textbox = gr.Textbox(label="Cover Letter", lines=20)
                 
-            run_button = gr.Button("Run", variant="primary")
-            run_button.click(fn=self.request_letter, inputs=job_post_textbox, outputs=cover_letter_textbox)
-
             with gr.Row():
-                resume_file = gr.File(label="Tailored Resume PDF")
-                resume_feedback_textbox = gr.Textbox(label="Resume Feedback", lines=5)
+                run_button = gr.Button("Run", variant="primary")
+                convert_pdf_button = gr.Button("Convert to PDF", variant="secondary")
+                cover_letter_file = gr.File(label="Cover Letter PDF", value=self.empty_file_path, visible=False)
             
-            resume_button = gr.Button("Tailor Resume", variant="primary")
-            resume_button.click(fn=self.tailor_resume, inputs=[job_post_textbox, resume_feedback_textbox], outputs=resume_file)
+            run_button.click(fn=self.request_letter, inputs=job_post_textbox, outputs=cover_letter_textbox)
+            convert_pdf_button.click(fn=lambda: gr.File(value=self.empty_file_path, visible=True), outputs=cover_letter_file).then(
+                fn=self.convert_cover_letter_to_pdf, 
+                inputs=cover_letter_textbox, 
+                outputs=cover_letter_file
+            )
+
+
+            resume_feedback_textbox = gr.Textbox(label="Resume Feedback", lines=5)
+            
+            with gr.Row():
+                resume_button = gr.Button("Tailor Resume", variant="primary")
+                resume_file = gr.File(label="Tailored Resume PDF", value=self.empty_file_path, visible=False)
+                               
+            
+            resume_button.click(fn=lambda: gr.File(value=self.empty_file_path, visible=True), outputs=resume_file).then(
+                fn=self.tailor_resume, 
+                inputs=[job_post_textbox, resume_feedback_textbox], 
+                outputs=resume_file
+            )
             job_post_textbox.submit(fn=self.request_letter, inputs=job_post_textbox, outputs=cover_letter_textbox)
         
         ui.launch(inbrowser=True)
@@ -308,6 +331,7 @@ Current LaTeX code:
 {resume}
 
 Please return only the corrected LaTeX code, nothing else.
+Do not include markdown formatting, and any other text or comments.
 """
             
             # Get the fixed LaTeX from AI
@@ -332,6 +356,55 @@ Please return only the corrected LaTeX code, nothing else.
                 print("LaTeX compilation failed even after AI fix attempt")
 
         return pdf_path
+
+
+
+
+    def convert_cover_letter_to_pdf(self, cover_letter_text):
+        """Convert cover letter text to PDF"""
+        try:
+            # Check if text is empty
+            if not cover_letter_text or not cover_letter_text.strip():
+                print("No cover letter text provided for PDF conversion")
+                return None
+                
+            output_dir = "static/output"
+            os.makedirs(output_dir, exist_ok=True)
+            pdf_path = os.path.join(output_dir, "cover_letter.pdf")
+            
+            # Create PDF document
+            doc = SimpleDocTemplate(pdf_path, pagesize=letter,
+                                  rightMargin=72, leftMargin=72,
+                                  topMargin=72, bottomMargin=18)
+            
+            # Get styles
+            styles = getSampleStyleSheet()
+            normal_style = styles['Normal']
+            normal_style.fontSize = 11
+            normal_style.leading = 14
+            normal_style.spaceAfter = 12
+            
+            # Build story
+            story = []
+            
+            # Split text into paragraphs and add to story
+            paragraphs = cover_letter_text.split('\n\n')
+            for para in paragraphs:
+                if para.strip():
+                    # Replace single line breaks with spaces within paragraphs
+                    para = para.replace('\n', ' ')
+                    story.append(Paragraph(para, normal_style))
+                    story.append(Spacer(1, 12))
+            
+            # Build PDF
+            doc.build(story)
+            
+            print(f"Cover letter PDF created: {pdf_path}")
+            return pdf_path
+            
+        except Exception as e:
+            print(f"Error creating cover letter PDF: {str(e)}")
+            return None
 
 
 # runs the code
