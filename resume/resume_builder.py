@@ -55,9 +55,6 @@ def scrape_webpage_simple(url, cache=None):
 
 
 class ResumeBuilder:
-
-
-
     # Can take all of the following as optional parameters.
     # Pass in the parameters that you want to change from the default values. 
     def __init__(self, 
@@ -72,6 +69,7 @@ class ResumeBuilder:
                 evaluator_prompt = "",
                 include_feedback = False
                 ):
+        
         
         self.creator_model = creator_model
         self.evaluator_model = evaluator_model
@@ -156,11 +154,12 @@ Here is the list of projects you list on the resume:
 Please:
 - Rewrite the Profile section to emphasize alignment with the job.
 - Reorder/trim the SKILLS section to highlight the most relevant ones.
-- Select the most relevant PROJECTS/EXPERIENCES and update their bullet points with job-specific keywords.
+- Select the most relevant PROJECTS/EXPERIENCES.
 - Return the full LaTeX code for the resume, keeping the formatting intact.
 - Make sure that the resume fills the page, but does not overflow.
 - Do not include markdown formatting, and any other text or comments.
 - Do not modify the resume outside of the sections that are specified.
+- Implement the feedback provided by the user.
 """     
         self.launch()
         
@@ -171,13 +170,16 @@ Please:
             with gr.Row():
                 job_post_textbox = gr.Textbox(label="Paste the job posting text or link here", lines = 20)
                 cover_letter_textbox = gr.Textbox(label="Cover Letter", lines=20)
-            
+                
             run_button = gr.Button("Run", variant="primary")
             run_button.click(fn=self.request_letter, inputs=job_post_textbox, outputs=cover_letter_textbox)
 
-            resume_file = gr.File(label="Tailored Resume PDF")
+            with gr.Row():
+                resume_file = gr.File(label="Tailored Resume PDF")
+                resume_feedback_textbox = gr.Textbox(label="Resume Feedback", lines=5)
+            
             resume_button = gr.Button("Tailor Resume", variant="primary")
-            resume_button.click(fn=self.tailor_resume, inputs=job_post_textbox, outputs=resume_file)
+            resume_button.click(fn=self.tailor_resume, inputs=[job_post_textbox, resume_feedback_textbox], outputs=resume_file)
             job_post_textbox.submit(fn=self.request_letter, inputs=job_post_textbox, outputs=cover_letter_textbox)
         
         ui.launch(inbrowser=True)
@@ -254,7 +256,10 @@ Please:
         return "Unable to generate cover letter" +"\n" + evaluation.feedback    
 
 
-    def tailor_resume(self, job_posting):
+
+
+
+    def tailor_resume(self, job_posting, resume_feedback):
         page = scrape_webpage_simple(job_posting, self.scraped_content_cache)
         print(page)
         if page == 'error':
@@ -262,7 +267,7 @@ Please:
         else:
             job_posting = page
         
-        resume = self.run(self.resume_prompt, job_posting)
+        resume = self.run(self.resume_prompt, "Feedback: " + resume_feedback + "\n\nJob Posting: \n" + job_posting)
 
         output_dir = "static/output"
         os.makedirs(output_dir, exist_ok=True)
@@ -283,6 +288,48 @@ Please:
 
         print("Tectonic STDOUT:\n", result.stdout)
         print("Tectonic STDERR:\n", result.stderr)
+
+        # Check if compilation was successful
+        if result.returncode != 0:
+            print(f"LaTeX compilation failed with return code {result.returncode}")
+            print("Attempting to fix LaTeX with AI...")
+            
+            # Feed the error back to the AI to fix the LaTeX
+            error_context = f"LaTeX compilation failed with return code {result.returncode}"
+            if result.stderr:
+                error_context += f"\nError details: {result.stderr}"
+            
+            fix_prompt = f"""
+The LaTeX compilation failed. Please fix the LaTeX code and return the corrected version.
+
+Error: {error_context}
+
+Current LaTeX code:
+{resume}
+
+Please return only the corrected LaTeX code, nothing else.
+"""
+            
+            # Get the fixed LaTeX from AI
+            fixed_resume = self.run(fix_prompt, "")
+            
+            # Try compilation again with fixed LaTeX
+            with open(tex_path, "w", encoding="utf-8") as f:
+                f.write(fixed_resume)
+            
+            result = subprocess.run(
+                ["tectonic", filename],
+                cwd=output_dir,
+                capture_output=True,
+                text=True
+            )
+            
+            print("Tectonic STDOUT (retry):\n", result.stdout)
+            print("Tectonic STDERR (retry):\n", result.stderr)
+            
+            # If it still fails, return the original PDF path (might be empty/corrupted)
+            if result.returncode != 0:
+                print("LaTeX compilation failed even after AI fix attempt")
 
         return pdf_path
 
