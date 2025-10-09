@@ -116,7 +116,7 @@ Don't be too verbose, and use a 3 paragraph format.
 Respond with a cover letter and nothing else.
 Do not include the address or contact information. 
 You will be given a job description, and you will need to tailor the cover letter to the job description.
-You will be evaluated, and if evalutor decides that your cover letter is not up to standart, you will be given your previus cover letters and feedback on them. 
+You will be evaluated, and if evalutor decides that your cover letter is not up to standart, you will be given your previus cover letter and feedback on it. 
 You have to listen to the feedback, and improve your cover letter accordingly to the feedback.
 \n\n## Summary:\n{summary}\n\n## Resume:\n{resume}\n\n ## Cover Letter Template:\n{cover_letter_template}\n\n
 """
@@ -129,17 +129,20 @@ You have to listen to the feedback, and improve your cover letter accordingly to
         # Evaluator prompt - Tweak it for the best results. 
         if (evaluator_prompt == ""):            
             self.evaluator_system_prompt = f"""
-You are a professional evaluator that decides whether a cover letter is acceptable. 
+You are a professional cover letter editor that decides whethera cover letter is acceptable. 
 You are provided with {name}'s summary and resume, an example of a cover letter from {name}, the job description, and the cover letter. 
-Your task is to evaluate the cover letter, and reply with whether it is acceptable and your feedback. 
+Your task is to evaluate the cover letter, and reply with whether it is acceptable and your feedback. Include a score from 0 to 100 with your feedback.
 You need to ensure if the cover letter is professional, engaging, and tailored to the job description. 
 You need to ensure if the cover letter was likely made by AI, and if it was made by AI, deny it, and provide feedback. Do not allow AI generated cover letters.
 You need to ensure that the cover letter has a strong and engaging opening paragraph. 
 You need to ensure that the cover letter is concise and uses the standard 3 paragraph format.
+Do not focus on adding skills that the user does not have.
 Here's the information:
-\n\n## Summary:\n{summary}\n\n## Resume:\n{resume}\n\n## Cover Letter Template:\n{cover_letter_template}\n\n
+\n\n## Summary:\n{summary}\n\n## Resume:\n{resume}\n\n
+
 With this context, please evaluate the cover letter, replying with whether the cover letter is acceptable and your feedback.
 """
+# ## Cover Letter Template:\n{cover_letter_template}\n\n
         else:
             self.evaluator_system_prompt = evaluator_prompt
    
@@ -217,7 +220,7 @@ Please:
 
 
     def update_system_prompt(self, cover_letter, feedback):
-        self.updated_system_prompt = self.updated_system_prompt + f"""
+        self.updated_system_prompt = self.system_prompt + f"""
         \n\n## Previous cover letter rejected\nYou just tried to create a cover letter, but the quality control rejected your cover letter\n
         ## Your attempted cover letter:\n{cover_letter}\n\n
         ## Reason for rejection:\n{feedback}\n\n
@@ -332,6 +335,7 @@ Current LaTeX code:
 
 Please return only the corrected LaTeX code, nothing else.
 Do not include markdown formatting, and any other text or comments.
+Do not include "latex" and "```" in the response.
 """
             
             # Get the fixed LaTeX from AI
