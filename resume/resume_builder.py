@@ -80,7 +80,8 @@ class ResumeBuilder:
         self.evaluator_model = evaluator_model
         self.eval_limit = eval_limit
         self.include_feedback = include_feedback
-        
+        self.use_last_resume = False
+        self.last_resume_content = None
         # Cache for scraped content to avoid repeated scraping between request_letter and tailor_resume
         self.scraped_content_cache = {}
         
@@ -207,26 +208,34 @@ Please:
                 cover_letter_file = gr.File(label="Cover Letter PDF", value=self.empty_file_path, visible=False)
             
             run_button.click(fn=self.request_letter, inputs=job_post_textbox, outputs=cover_letter_textbox)
+            
+            job_post_textbox.submit(fn=self.request_letter, inputs=job_post_textbox, outputs=cover_letter_textbox)
+
             convert_pdf_button.click(fn=lambda: gr.File(value=self.empty_file_path, visible=True), outputs=cover_letter_file).then(
                 fn=self.convert_cover_letter_to_pdf, 
                 inputs=cover_letter_textbox, 
                 outputs=cover_letter_file
             )
+            
 
 
+            gr.Markdown("## Resume Tailoring")
             resume_feedback_textbox = gr.Textbox(label="Resume Feedback", lines=5)
             
             with gr.Row():
-                resume_button = gr.Button("Tailor Resume", variant="primary")
+                resume_button = gr.Button("Tailor Resume", variant="primary", scale=2)
+                use_last_resume_checkbox = gr.Checkbox(label="Use Last Resume", value=False, visible=False, scale=1)
                 resume_file = gr.File(label="Tailored Resume PDF", value=self.empty_file_path, visible=False)
                                
             
             resume_button.click(fn=lambda: gr.File(value=self.empty_file_path, visible=True), outputs=resume_file).then(
                 fn=self.tailor_resume, 
-                inputs=[job_post_textbox, resume_feedback_textbox], 
-                outputs=resume_file
-            )
-            job_post_textbox.submit(fn=self.request_letter, inputs=job_post_textbox, outputs=cover_letter_textbox)
+                inputs=[job_post_textbox, resume_feedback_textbox, use_last_resume_checkbox], 
+                outputs=[resume_file]).then(
+                fn=lambda: gr.Checkbox(visible=True), 
+                outputs=use_last_resume_checkbox)
+            
+            
         
         ui.launch(inbrowser=True)
 
@@ -306,15 +315,18 @@ Please:
                     max_score = evaluation.score
                     best_cover_letter = cover_letter
         print("Failed evaluation - returning reply")
+        print(f"## Score:{evaluation.score}")
+        print(f"## Cover Letter:\n{cover_letter}")
+        print(f"## Feedback:\n{evaluation.feedback}")
         if self.include_feedback:
-            return cover_letter + "\n\n\n" + evaluation.feedback;
-        return cover_letter
+            return best_cover_letter + "\n\n\n" + evaluation.feedback;
+        return best_cover_letter
 
 
 
 
 
-    def tailor_resume(self, job_posting, resume_feedback):
+    def tailor_resume(self, job_posting, resume_feedback, use_last_resume=False):
         page = scrape_webpage_simple(job_posting, self.scraped_content_cache)
         print(page)
         if page == 'error':
@@ -322,7 +334,22 @@ Please:
         else:
             job_posting = page
         
-        resume = self.run(self.resume_prompt, "Feedback: " + resume_feedback + "\n\nJob Posting: \n" + job_posting)
+        # Use last resume as base if checkbox is checked and we have a previous resume
+        if use_last_resume and self.last_resume_content:
+            print("Using last resume as base for tailoring")
+            prompt_with_last_resume = self.resume_prompt + f"""
+
+Here is the last generated resume that should be used as the base:
+{self.last_resume_content}
+
+Please tailor this existing resume rather than starting from the original template.
+"""
+            resume = self.run(prompt_with_last_resume, "Feedback: " + resume_feedback + "\n\nJob Posting: \n" + job_posting)
+        elif use_last_resume and not self.last_resume_content:
+            print("No previous resume available. Creating a new resume from the original template.")
+            resume = self.run(self.resume_prompt, "Feedback: " + resume_feedback + "\n\nJob Posting: \n" + job_posting)
+        else:
+            resume = self.run(self.resume_prompt, "Feedback: " + resume_feedback + "\n\nJob Posting: \n" + job_posting)
 
         output_dir = "static/output"
         os.makedirs(output_dir, exist_ok=True)
@@ -388,9 +415,11 @@ Please:
             if result.returncode != 0:
                 print("LaTeX compilation failed even after AI fix attempt")
 
+        # Store the generated resume content for future use
+        self.last_resume_content = resume
+        print("Stored last resume content for future tailoring")
+
         return pdf_path
-
-
 
 
     def convert_cover_letter_to_pdf(self, cover_letter_text):
