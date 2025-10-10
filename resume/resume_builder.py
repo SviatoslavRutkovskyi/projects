@@ -105,21 +105,28 @@ class ResumeBuilder:
                     resume += text
         # System prompt - Tweak it for the best results. 
         if (system_prompt == ""):
-            self.system_prompt =  f"""You are a proffesional cover letter writer, and your job is to write a cover letter for {name}, highlighting {name}'s skills, experience, and achievements. 
-particularly questions related to {name}'s career, background, skills and experience. 
-Your responsibility is to represent {name} in the letter as faithfully as possible. 
-You are given a summary of {name}'s background and Resume which you can use in the cover letter. 
-You are given an example of a cover letter from {name}. Try and use a similar language and style. Do NOT include the placeholder information in the cover letter. 
-Be professional and engaging, uing the tone and style suitable for a cover letter.
-Do not make up any information, and only use the information provided.
-Don't be too verbose, and use a 3 paragraph format.
-Respond with a cover letter and nothing else.
-Do not include the address or contact information. 
-You will be given a job description, and you will need to tailor the cover letter to the job description.
-You will be evaluated, and if evalutor decides that your cover letter is not up to standart, you will be given your previus cover letter and feedback on it. 
-You have to listen to the feedback, and improve your cover letter accordingly to the feedback.
-\n\n## Summary:\n{summary}\n\n## Resume:\n{resume}\n\n ## Cover Letter Template:\n{cover_letter_template}\n\n
-"""
+            self.system_prompt =  f"""
+            You are a proffesional cover letter writer, and your job is to write a cover letter for {name}, highlighting {name}'s skills, experience, and achievements. 
+            You will be given a job description, and you will need to tailor the cover letter to the job description.
+            Your responsibility is to represent {name} in the letter as faithfully as possible. 
+            You are given a summary of {name}'s background and Resume which you can use in the cover letter. 
+            You are given an example of a cover letter from {name}. Try and use a similar language and style. Do NOT include the placeholder information in the cover letter. 
+            Be professional and engaging, uing the tone and style suitable for a cover letter.
+            Do not make up any information, and only use the information provided.
+            Don't be too verbose, and use a 3 paragraph format.
+            Avoid filler words and buzzwords such as “passionate,” “thrilled,” “dynamic,” “cutting-edge,” “fast-paced environment,” or “innovative solutions.”
+            Show confidence through concrete examples, not adjectives
+            Incorporate keywords and skills from the provided job description to ensure it passes an ATS scan.
+            Mention technical tools, programming languages, and frameworks naturally within sentences
+            Focus on relevant achievements and measurable outcomes
+            Tie experiences directly to the company’s focus or mission — explain why you’re interested, but in one grounded sentence
+            Respond with a cover letter and nothing else.
+            Avoid exaggeration, emotional language, or clichés
+            Do not include the address or contact information. 
+            You will be evaluated, and if evalutor decides that your cover letter is not up to standart, you will be given your previus cover letter and feedback on it. 
+            You have to listen to the feedback, and improve your cover letter accordingly to the feedback.
+            \n\n## Summary:\n{summary}\n\n## Resume:\n{resume}\n\n ## Cover Letter Template:\n{cover_letter_template}\n\n
+            """
         else:
             self.system_prompt = system_prompt
 
@@ -129,19 +136,19 @@ You have to listen to the feedback, and improve your cover letter accordingly to
         # Evaluator prompt - Tweak it for the best results. 
         if (evaluator_prompt == ""):            
             self.evaluator_system_prompt = f"""
-You are a professional cover letter editor that decides whethera cover letter is acceptable. 
-You are provided with {name}'s summary and resume, an example of a cover letter from {name}, the job description, and the cover letter. 
-Your task is to evaluate the cover letter, and reply with whether it is acceptable and your feedback. Include a score from 0 to 100 with your feedback.
-You need to ensure if the cover letter is professional, engaging, and tailored to the job description. 
-You need to ensure if the cover letter was likely made by AI, and if it was made by AI, deny it, and provide feedback. Do not allow AI generated cover letters.
-You need to ensure that the cover letter has a strong and engaging opening paragraph. 
-You need to ensure that the cover letter is concise and uses the standard 3 paragraph format.
-Do not focus on adding skills that the user does not have.
-Here's the information:
-\n\n## Summary:\n{summary}\n\n## Resume:\n{resume}\n\n
+                You are a professional cover letter editor that decides whethera cover letter is acceptable. 
+                You are provided with {name}'s summary and resume, an example of a cover letter from {name}, the job description, and the cover letter. 
+                Your task is to evaluate the cover letter, and reply with whether it is acceptable and your feedback. Include a score from 0 to 100 with your feedback.
+                You need to ensure if the cover letter is professional, engaging, and tailored to the job description. 
+                You need to ensure if the cover letter was likely made by AI, and if it was made by AI, deny it, and provide feedback. Do not allow AI generated cover letters.
+                You need to ensure that the cover letter has a strong and engaging opening paragraph. 
+                You need to ensure that the cover letter is concise and uses the standard 3 paragraph format.
+                Do not focus on adding skills that the user does not have.
+                Here's the information:
+                \n\n## Summary:\n{summary}\n\n## Resume:\n{resume}\n\n
 
-With this context, please evaluate the cover letter, replying with whether the cover letter is acceptable and your feedback.
-"""
+                With this context, please evaluate the cover letter, replying with whether the cover letter is acceptable and your feedback.
+                """
 # ## Cover Letter Template:\n{cover_letter_template}\n\n
         else:
             self.evaluator_system_prompt = evaluator_prompt
@@ -153,24 +160,24 @@ With this context, please evaluate the cover letter, replying with whether the c
             projects = f.read()
 
         self.resume_prompt = f"""
-You are helping tailor a LaTeX resume.
+            You are helping tailor a LaTeX resume.
 
-Here is the current LaTeX resume:
-{resume_tex}
+            Here is the current LaTeX resume:
+            {resume_tex}
 
-Here is the list of projects you list on the resume:
-{projects}
+            Here is the list of projects you list on the resume:
+            {projects}
 
-Please:
-- Rewrite the Profile section to emphasize alignment with the job.
-- Reorder/trim the SKILLS section to highlight the most relevant ones.
-- Select the most relevant PROJECTS/EXPERIENCES.
-- Return the full LaTeX code for the resume, keeping the formatting intact.
-- Make sure that the resume fills the page, but does not overflow.
-- Do not include markdown formatting, and any other text or comments.
-- Do not modify the resume outside of the sections that are specified.
-- Implement the feedback provided by the user.
-"""     
+            Please:
+            - Rewrite the Profile section to emphasize alignment with the job.
+            - Reorder/trim the SKILLS section to highlight the most relevant ones.
+            - Select the most relevant PROJECTS/EXPERIENCES.
+            - Return the full LaTeX code for the resume, keeping the formatting intact.
+            - Make sure that the resume fills the page, but does not overflow.
+            - Do not include markdown formatting, and any other text or comments.
+            - Do not modify the resume outside of the sections that are specified.
+            - Implement the feedback provided by the user.
+            """     
         self.launch()
         
 
@@ -213,18 +220,18 @@ Please:
     @staticmethod
     def evaluator_cover_letter(job_post, cover_letter):
         return f"""
-    Here's the job posting presented by the user: \n\n{job_post}\n\n
-    Here's the cover letter generated by the agent: \n\n{cover_letter}\n\n
-    Please evaluate the response, replying with whether it is acceptable and your extensive feedback.
-    """
+            Here's the job posting presented by the user: \n\n{job_post}\n\n
+            Here's the cover letter generated by the agent: \n\n{cover_letter}\n\n
+            Please evaluate the response, replying with whether it is acceptable and your extensive feedback.
+            """
 
 
     def update_system_prompt(self, cover_letter, feedback):
         self.updated_system_prompt = self.system_prompt + f"""
-        \n\n## Previous cover letter rejected\nYou just tried to create a cover letter, but the quality control rejected your cover letter\n
-        ## Your attempted cover letter:\n{cover_letter}\n\n
-        ## Reason for rejection:\n{feedback}\n\n
-        """
+            \n\n## Previous cover letter rejected\nYou just tried to create a cover letter, but the quality control rejected your cover letter\n
+            ## Your attempted cover letter:\n{cover_letter}\n\n
+            ## Reason for rejection:\n{feedback}\n\n
+            """
         return self.updated_system_prompt;
 
 
@@ -326,17 +333,17 @@ Please:
                 error_context += f"\nError details: {result.stderr}"
             
             fix_prompt = f"""
-The LaTeX compilation failed. Please fix the LaTeX code and return the corrected version.
+                The LaTeX compilation failed. Please fix the LaTeX code and return the corrected version.
 
-Error: {error_context}
+                Error: {error_context}
 
-Current LaTeX code:
-{resume}
+                Current LaTeX code:
+                {resume}
 
-Please return only the corrected LaTeX code, nothing else.
-Do not include markdown formatting, and any other text or comments.
-Do not include "latex" and "```" in the response.
-"""
+                Please return only the corrected LaTeX code, nothing else.
+                Do not include markdown formatting, and any other text or comments.
+                Do not include "latex" and "```" in the response.
+                """
             
             # Get the fixed LaTeX from AI
             fixed_resume = self.run(fix_prompt, "")
