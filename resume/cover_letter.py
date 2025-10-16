@@ -77,6 +77,7 @@ Mention technical tools, programming languages, and frameworks naturally within 
 Focus on relevant achievements and measurable outcomes
 Tie experiences directly to the company’s focus or mission — explain why you’re interested, but in one grounded sentence
 Respond with a cover letter and nothing else.
+Do not include the job description in the cover letter.
 Avoid exaggeration, emotional language, or clichés
 Do not include the address or contact information. 
 You will be evaluated, and if evalutor decides that your cover letter is not up to standart, you will be given your previus cover letter and feedback on it. 
