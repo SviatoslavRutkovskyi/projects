@@ -2,19 +2,13 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from pypdf import PdfReader
 import gradio as gr
-from pydantic import BaseModel
 import os
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
+from models import Evaluation
 
 load_dotenv(override=True)
-
-
-class Evaluation(BaseModel):
-    is_acceptable: bool
-    feedback: str
-    score: int
 
 
 class CoverLetter:
