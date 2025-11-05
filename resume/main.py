@@ -22,7 +22,7 @@ class Main:
                 summary_path = "../me/summary.txt",
                 cover_letter_path = "../me/cover_letter_template.txt",
                 resume_path = "../me/resume.pdf",
-                projects_path = "resources/projects.txt",
+                candidate_json_path = "resources/candidate.json",
                 cover_letter_system_prompt = "",
                 cover_letter_evaluator_prompt = "",
                 resume_system_prompt = "",
@@ -53,7 +53,7 @@ class Main:
    
         self.resume_builder = Resume(
             creator_model=creator_model, 
-            projects_path=projects_path,
+            candidate_json_path=candidate_json_path,
             system_prompt=resume_system_prompt)
         self.cover_letter_builder = CoverLetter(
             evaluator_model=evaluator_model, 

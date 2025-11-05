@@ -1,116 +1,68 @@
-from dotenv import load_dotenv
 from openai import OpenAI
-from pypdf import PdfReader
 import subprocess
 import os
+import json
 from latex_generator import LatexGenerator
 from models import ResumeData
 
 
+# Constants
+DEFAULT_OUTPUT_DIR = "static/output"
+
+
 class Resume:
-        # Can take all of the following as optional parameters.
-    # Pass in the parameters that you want to change from the default values. 
+    """Resume tailoring class.""" 
     def __init__(self, 
                 creator_model = "gpt-5-mini", 
-                resume_path = "resources/resume_original.pdf",
-                projects_path = "resources/projects.txt",
+                candidate_json_path = "resources/candidate.json",
                 system_prompt = "",
+                temperature = 0.3,
                 ):
         
-        self.resume_path = resume_path
+        self.candidate_json_path = candidate_json_path
         self.creator_model = creator_model
+        self.temperature = temperature
         self.latex_generator = LatexGenerator()
 
-        self.use_last_resume = False
         self.last_resume_content = None
         
+        # Load candidate data eagerly (always needed for tailoring)
+        self.candidate_data = self._load_candidate_data()
+        
+        # Build system prompt with static content (candidate JSON, schema, rules)
+        self.system_prompt = system_prompt if system_prompt else self._build_system_prompt()
     
         # AI models 
         self.openai = OpenAI()
-   
-        # with open(resume_path, "r") as f:
-        #     resume_tex = f.read()
-        
-        reader = PdfReader(resume_path)
-        resume = ""
-
-        for page in reader.pages:
-            text = page.extract_text()
-            if text:
-                resume += text
-
-        with open(projects_path, "r") as f:
-            projects = f.read()
-
-        if (system_prompt == ""):
-            self.system_prompt = f"""
-You are helping tailor a resume to a given job posting.
-
-Here is the current LaTeX resume:
-{resume}
-
-Here is the list of projects you can list on the resume:
-{projects}
-
-Please:
-- Rewrite the Profile section to emphasize alignment with the job.
-- Reorder/trim the SKILLS section to highlight the most relevant ones.
-- Select the most relevant PROJECTS/EXPERIENCES.
-- Return the resume in a JSON format.
-- Include 1 - 2 experiences that are relevant to the job posting.
-- Include 2 - 3 bullet points for each experience.
-- Include 2 - 3 projects that are relevant to the job posting.
-- Include 3 - 4 bullet points for each project.
-- Do not include markdown formatting, and any other text or comments.
-- Do not fake any information, and only use the information provided.
-- If you are given addional user instructions, follow them. Do not modify the resume outside of the sections that are specified.
-            """    
-        else:
-            self.system_prompt = system_prompt
 
 
     def tailor_resume(self, job_posting, resume_feedback, use_last_resume=False):
-        
-        # Use last resume as base if checkbox is checked and we have a previous resume
+        """Tailor resume to job posting."""
         if use_last_resume and self.last_resume_content:
             print("Using last resume as base for tailoring")
-            prompt_with_last_resume = self.system_prompt + f"""
-
-Here is the last generated resume that should be used as the base:
-{self.last_resume_content}
-
-Please tailor this existing resume rather than starting from the original template.
-"""
-            resume_data = self.run(prompt_with_last_resume, "User Instructions  : " + resume_feedback + "\n\nJob Posting: \n" + job_posting)
         elif use_last_resume and not self.last_resume_content:
             print("No previous resume available. Creating a new resume from the original template.")
-            resume_data = self.run(self.system_prompt, "User Instructions: " + resume_feedback + "\n\nJob Posting: \n" + job_posting)
-        else:
-            resume_data = self.run(self.system_prompt, "User Instructions: " + resume_feedback + "\n\nJob Posting: \n" + job_posting)
+        
+        user_message = self._build_user_message(job_posting, resume_feedback, use_last_resume)
+        resume_data = self.run(self.system_prompt, user_message)
 
-        # Create output directory
-        output_dir = "static/output"
-        os.makedirs(output_dir, exist_ok=True)
-        tex_path = os.path.join(output_dir, "resume.tex")
+        # Generate PDF
+        os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True)
+        tex_path = os.path.join(DEFAULT_OUTPUT_DIR, "resume.tex")
         pdf_path = tex_path.replace(".tex", ".pdf")
 
-        # Convert JSON resume data to LaTeX
         latex_content = self.latex_generator.convert_json_to_latex(resume_data)
-        
         if latex_content is None:
             print("Failed to create LaTeX from JSON resume data")
             return None
 
-        # Write LaTeX to file
         with open(tex_path, "w", encoding="utf-8") as f:
             f.write(latex_content)
         
-        filename = os.path.basename(tex_path)  
-
-        # Compile LaTeX to PDF using tectonic
+        # Compile LaTeX to PDF
         result = subprocess.run(
-            ["tectonic", filename],
-            cwd=output_dir,
+            ["tectonic", os.path.basename(tex_path)],
+            cwd=DEFAULT_OUTPUT_DIR,
             capture_output=True,
             text=True
         )
@@ -118,30 +70,78 @@ Please tailor this existing resume rather than starting from the original templa
         print("Tectonic STDOUT:\n", result.stdout)
         print("Tectonic STDERR:\n", result.stderr)
 
-        # Check if compilation was successful
         if result.returncode != 0:
             print(f"LaTeX compilation failed with return code {result.returncode}")
             print("LaTeX error details:", result.stderr)
-            print("Please check the generated LaTeX file for issues.")
             return None
 
-        # Store the generated resume content for future use
         self.last_resume_content = resume_data.model_dump_json()
-        print("Stored last resume content for future tailoring")
-
         return pdf_path
 
-
-    def run(self, prompt, job_posting) -> ResumeData:
-        messages = [{"role": "system", "content": prompt},
-        {"role": "user", "content": job_posting},
-        {"role": "user", "content": "Reply ONLY in valid JSON: {\"profile\": \"...\", \"skills\": [{\"name\": \"...\", \"skills\": [\"...\"]}], \"projects\": [{\"name\": \"...\", \"date\": \"MMM YYYY\", \"github_link_names\": [\"...\"], \"github_links\": [\"...\"], \"bullet_points\": [\"...\"]}], \"experiences\": [{\"company_name\": \"...\", \"start_date\": \"MMM YYYY\", \"end_date\": \"MMM YYYY\", \"job_title\": \"...\", \"location\": \"...\", \"bullet_points\": [\"...\"]}]}"}
-        ]
+    def run(self, prompt, user_message) -> ResumeData:
+        """Run API call."""
         response = self.openai.responses.parse(
             model=self.creator_model,
-            input=messages,
-            text_format = ResumeData,
-            )
-        return response.output_parsed   
+            input=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": user_message}
+            ],
+            text_format=ResumeData,
+            temperature=self.temperature,
+        )
+        return response.output_parsed
+    
+    def _load_candidate_data(self) -> ResumeData:
+        """Load and validate candidate data from JSON file using ResumeData model."""
+        try:
+            with open(self.candidate_json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return ResumeData(**data)
+        except FileNotFoundError:
+            print(f"Error: Candidate JSON file not found at {self.candidate_json_path}")
+            raise
+        except json.JSONDecodeError as e:
+            print(f"Error: Invalid JSON in candidate file: {e}")
+            raise
+        except Exception as e:
+            print(f"Error: Invalid candidate data structure: {e}")
+            print("Expected format matches ResumeData schema (profile, skills, projects, experiences)")
+            raise
+    
+    def _build_system_prompt(self):
+        """Build system prompt with candidate JSON, schema, and rules."""
+        candidate_json = self.candidate_data.model_dump_json(indent=2)
+        json_schema = json.dumps(ResumeData.model_json_schema(), indent=2)
+        
+        return f"""You are an expert resume tailoring specialist.
+
+Candidate JSON:
+{candidate_json}
+
+Return ONLY JSON per this schema:
+{json_schema}
+
+Rules:
+- Rewrite Profile section to emphasize alignment with the job posting (2-3 sentences, 50-100 words)
+- Reorder/trim SKILLS section to prioritize those mentioned in the job posting
+- Select 2-3 most relevant PROJECTS that match job requirements (3-4 bullet points each)
+- Select 1-2 most relevant EXPERIENCES (2-3 bullet points each)
+- Use action verbs and quantify achievements
+- Focus on results and impact
+- Ensure all dates are in "MMM YYYY" format (e.g., "Jan 2024")
+- Do not include markdown formatting or any other text/comments
+- Do not fake any information - use only information provided in the Candidate JSON"""
+    
+    def _build_user_message(self, job_posting, resume_feedback, use_last_resume=False):
+        """Build user message with job posting, optional last resume, and feedback."""
+        user_message = f"Job Posting:\n{job_posting}"
+        
+        if use_last_resume and self.last_resume_content:
+            user_message += f"\n\nUse this resume as your starting point:\n{self.last_resume_content}"
+        
+        if resume_feedback:
+            user_message += f"\n\nUser Instructions: {resume_feedback}"
+        
+        return user_message   
 
 
