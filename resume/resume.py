@@ -3,7 +3,7 @@ import subprocess
 import os
 import json
 from latex_generator import LatexGenerator
-from models import ResumeData
+from models import ResumeData, JobDescription
 
 
 # Constants
@@ -36,14 +36,14 @@ class Resume:
         self.openai = OpenAI()
 
 
-    def tailor_resume(self, job_posting, resume_feedback, use_last_resume=False):
-        """Tailor resume to job posting."""
+    def tailor_resume(self, job_info: JobDescription, resume_feedback, use_last_resume=False):
+        """Tailor resume to job posting using structured job information."""
         if use_last_resume and self.last_resume_content:
             print("Using last resume as base for tailoring")
         elif use_last_resume and not self.last_resume_content:
             print("No previous resume available. Creating a new resume from the original template.")
         
-        user_message = self._build_user_message(job_posting, resume_feedback, use_last_resume)
+        user_message = self._build_user_message(job_info, resume_feedback, use_last_resume)
         resume_data = self.run(self.system_prompt, user_message)
 
         # Generate PDF
@@ -132,9 +132,11 @@ Rules:
 - Do not include markdown formatting or any other text/comments
 - Do not fake any information - use only information provided in the Candidate JSON"""
     
-    def _build_user_message(self, job_posting, resume_feedback, use_last_resume=False):
-        """Build user message with job posting, optional last resume, and feedback."""
-        user_message = f"Job Posting:\n{job_posting}"
+    def _build_user_message(self, job_info: JobDescription, resume_feedback, use_last_resume=False):
+        """Build user message with structured job information, optional last resume, and feedback."""
+        # Format the structured job information into a readable prompt
+        formatted_job_info = job_info.model_dump_json(indent=2)
+        user_message = f"Job Posting Information:\n{formatted_job_info}"
         
         if use_last_resume and self.last_resume_content:
             user_message += f"\n\nUse this resume as your starting point:\n{self.last_resume_content}"
