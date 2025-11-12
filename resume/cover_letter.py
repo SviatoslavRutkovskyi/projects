@@ -3,10 +3,12 @@ from openai import OpenAI
 from pypdf import PdfReader
 import gradio as gr
 import os
+import glob
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from models import Evaluation, JobDescription
+from utils import sanitize_filename
 
 load_dotenv(override=True)
 
@@ -35,6 +37,9 @@ class CoverLetter:
         
         # Use empty.pdf for consistent file component sizing
         self.empty_file_path = "resources/empty.pdf"
+        
+        # Store last job info for PDF filename
+        self.last_job_info = None
     
         # AI models 
         self.openai = OpenAI()
@@ -161,6 +166,7 @@ Here's the information:
     def request_letter(self, job_info: JobDescription):
         print("Requesting cover letter")
         print(f"Job: {job_info.job_title or 'N/A'} at {job_info.company_name or 'N/A'}")
+        self.last_job_info = job_info  # Store for PDF filename
         cover_letter = self.run(self.system_prompt, job_info)
 
         eval_counter = 0
@@ -196,8 +202,6 @@ Here's the information:
             return best_cover_letter + "\n\n\n" + evaluation.feedback;
         return best_cover_letter
 
-
-
     def convert_cover_letter_to_pdf(self, cover_letter_text):
         """Convert cover letter text to PDF"""
         try:
@@ -208,7 +212,23 @@ Here's the information:
                 
             output_dir = "static/output"
             os.makedirs(output_dir, exist_ok=True)
-            pdf_path = os.path.join(output_dir, "cover_letter.pdf")
+            
+            # Remove old cover letter file (only expecting 1 cover letter file)
+            for old_file in glob.glob(os.path.join(output_dir, "cover_letter*")):
+                os.remove(old_file)
+            
+            # Create filename with company name
+            company_name = self.last_job_info.company_name if self.last_job_info else None
+            if company_name:
+                company_name_sanitized = sanitize_filename(company_name)
+                if company_name_sanitized:
+                    filename_base = f"cover_letter_{company_name_sanitized}"
+                else:
+                    filename_base = "cover_letter"
+            else:
+                filename_base = "cover_letter"
+            
+            pdf_path = os.path.join(output_dir, f"{filename_base}.pdf")
             
             # Create PDF document
             doc = SimpleDocTemplate(pdf_path, pagesize=letter,

@@ -220,6 +220,8 @@ Return ONLY valid JSON with missing fields as null or [].
                         "The job description does not contain enough information for resume/cover letter generation. "
                         "Please ensure at least 2 of the following are present: "
                         "job title, at least 2 required skills, at least 2 responsibilities, or a description summary (40+ chars)."
+                        f"Job info: {job_info.model_dump_json(indent=2)}"
+                        f"Raw job text: {raw_job_text}"
                     )
                 
                 # Cache the result only if everything succeeded

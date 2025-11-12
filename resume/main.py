@@ -63,7 +63,6 @@ class Main:
         self.job_processor = JobProcessor(model=creator_model)
 
         self.launch()
-        
 
     def launch(self):
         with gr.Blocks(theme=gr.themes.Default(primary_hue="sky")) as ui:

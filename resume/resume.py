@@ -2,8 +2,11 @@ from openai import OpenAI
 import subprocess
 import os
 import json
+import time
+import glob
 from latex_generator import LatexGenerator
 from models import ResumeData, JobDescription
+from utils import sanitize_filename
 
 
 # Constants
@@ -35,31 +38,52 @@ class Resume:
         # AI models 
         self.openai = OpenAI()
 
-
     def tailor_resume(self, job_info: JobDescription, resume_feedback, use_last_resume=False):
         """Tailor resume to job posting using structured job information."""
+        start_time = time.time()
+        print(f"[1/4] Tailoring resume...")
         if use_last_resume and self.last_resume_content:
-            print("Using last resume as base for tailoring")
+            print("    Using last resume as base for tailoring")
         elif use_last_resume and not self.last_resume_content:
-            print("No previous resume available. Creating a new resume from the original template.")
+            print("    No previous resume available. Creating a new resume from the original template.")
         
         user_message = self._build_user_message(job_info, resume_feedback, use_last_resume)
+        elapsed = time.time() - start_time
+        print(f"[2/4] Generating tailored resume content... ({elapsed:.1f}s elapsed)")
         resume_data = self.run(self.system_prompt, user_message)
 
         # Generate PDF
+        elapsed = time.time() - start_time
+        print(f"[3/4] Converting to LaTeX... ({elapsed:.1f}s elapsed)")
+        
+        # Create output directory if needed
         os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True)
-        tex_path = os.path.join(DEFAULT_OUTPUT_DIR, "resume.tex")
-        pdf_path = tex_path.replace(".tex", ".pdf")
+        
+        # Remove old resume files (only expecting 1 resume file)
+        for old_file in glob.glob(os.path.join(DEFAULT_OUTPUT_DIR, "resume*")):
+            os.remove(old_file)
+        
+        # Create filename with company name
+        company_name_sanitized = sanitize_filename(job_info.company_name) if job_info.company_name else ""
+        if company_name_sanitized:
+            filename_base = f"resume_{company_name_sanitized}"
+        else:
+            filename_base = "resume"
+        
+        tex_path = os.path.join(DEFAULT_OUTPUT_DIR, f"{filename_base}.tex")
+        pdf_path = os.path.join(DEFAULT_OUTPUT_DIR, f"{filename_base}.pdf")
 
         latex_content = self.latex_generator.convert_json_to_latex(resume_data)
         if latex_content is None:
-            print("Failed to create LaTeX from JSON resume data")
+            print("    ✗ Failed to create LaTeX from JSON resume data")
             return None
 
         with open(tex_path, "w", encoding="utf-8") as f:
             f.write(latex_content)
         
         # Compile LaTeX to PDF
+        elapsed = time.time() - start_time
+        print(f"[4/4] Compiling PDF... ({elapsed:.1f}s elapsed)")
         result = subprocess.run(
             ["tectonic", os.path.basename(tex_path)],
             cwd=DEFAULT_OUTPUT_DIR,
@@ -67,15 +91,14 @@ class Resume:
             text=True
         )
 
-        print("Tectonic STDOUT:\n", result.stdout)
-        print("Tectonic STDERR:\n", result.stderr)
-
         if result.returncode != 0:
-            print(f"LaTeX compilation failed with return code {result.returncode}")
-            print("LaTeX error details:", result.stderr)
+            print(f"    ✗ LaTeX compilation failed with return code {result.returncode}")
+            print("    LaTeX error details:", result.stderr)
             return None
 
         self.last_resume_content = resume_data.model_dump_json()
+        elapsed = time.time() - start_time
+        print(f"    ✓ Resume generated successfully: {pdf_path} ({elapsed:.1f}s elapsed)")
         return pdf_path
 
     def run(self, prompt, user_message) -> ResumeData:
