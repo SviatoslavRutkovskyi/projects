@@ -5,6 +5,7 @@ import os
 from resume import Resume
 from cover_letter import CoverLetter
 from job_processor import JobProcessor
+from question_answerer import QuestionAnswerer
 
 load_dotenv(override=True)
 
@@ -60,6 +61,11 @@ class Main:
             system_prompt = cover_letter_system_prompt,
             evaluator_prompt = cover_letter_evaluator_prompt,
             include_feedback = include_feedback)
+        self.question_answerer = QuestionAnswerer(
+            creator_model=creator_model,
+            name=name,
+            summary_path=summary_path,
+            candidate_json_path=candidate_json_path)
         self.job_processor = JobProcessor(model=creator_model)
 
         self.launch()
@@ -104,6 +110,31 @@ class Main:
                 fn=lambda: gr.Checkbox(visible=True), 
                 outputs=use_last_resume_checkbox)
             
+            gr.Markdown("## Interview Question Answerer")
+            with gr.Row():
+                question_textbox = gr.Textbox(label="Enter your question", lines=3, placeholder="e.g., Tell me about yourself, Why are you interested in this role?, etc.")
+                answer_textbox = gr.Textbox(label="Answer", lines=10)
+            
+            with gr.Row():
+                answer_button = gr.Button("Answer Question", variant="primary")
+            
+            answer_button.click(
+                fn=lambda job_posting, question: self.question_answerer.answer_question(
+                    self.job_processor.process_and_extract_job_info(job_posting), 
+                    question
+                ) if question.strip() else "Please enter a question.",
+                inputs=[job_post_textbox, question_textbox],
+                outputs=answer_textbox
+            )
+            
+            question_textbox.submit(
+                fn=lambda job_posting, question: self.question_answerer.answer_question(
+                    self.job_processor.process_and_extract_job_info(job_posting), 
+                    question
+                ) if question.strip() else "Please enter a question.",
+                inputs=[job_post_textbox, question_textbox],
+                outputs=answer_textbox
+            )
         
         ui.launch(inbrowser=True)
 

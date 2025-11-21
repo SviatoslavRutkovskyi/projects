@@ -6,7 +6,7 @@ import time
 import glob
 from latex_generator import LatexGenerator
 from models import ResumeData, JobDescription
-from utils import sanitize_filename
+from utils import sanitize_filename, load_candidate_data
 
 
 # Constants
@@ -30,7 +30,7 @@ class Resume:
         self.last_resume_content = None
         
         # Load candidate data eagerly (always needed for tailoring)
-        self.candidate_data = self._load_candidate_data()
+        self.candidate_data = load_candidate_data(self.candidate_json_path)
         
         # Build system prompt with static content (candidate JSON, schema, rules)
         self.system_prompt = system_prompt if system_prompt else self._build_system_prompt()
@@ -113,23 +113,6 @@ class Resume:
             temperature=self.temperature,
         )
         return response.output_parsed
-    
-    def _load_candidate_data(self) -> ResumeData:
-        """Load and validate candidate data from JSON file using ResumeData model."""
-        try:
-            with open(self.candidate_json_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return ResumeData(**data)
-        except FileNotFoundError:
-            print(f"Error: Candidate JSON file not found at {self.candidate_json_path}")
-            raise
-        except json.JSONDecodeError as e:
-            print(f"Error: Invalid JSON in candidate file: {e}")
-            raise
-        except Exception as e:
-            print(f"Error: Invalid candidate data structure: {e}")
-            print("Expected format matches ResumeData schema (profile, skills, projects, experiences)")
-            raise
     
     def _build_system_prompt(self):
         """Build system prompt with candidate JSON, schema, and rules."""
