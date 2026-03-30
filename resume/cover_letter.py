@@ -146,37 +146,51 @@ Here's the information:
         self.last_job_info = job_info  # Store for PDF filename
         cover_letter = self.run(self.system_prompt, job_info)
 
+        max_score = -1
+        best_cover_letter = cover_letter
+        best_feedback = ""
+        last_evaluation = None
         eval_counter = 0
+
         while eval_counter < self.eval_limit:
-            max_score = 0
-            best_cover_letter = ""
             evaluation = self.evaluate(job_info, cover_letter)
+            last_evaluation = evaluation
             if evaluation.is_acceptable:
                 print("Passed evaluation - returning reply")
                 print(f"## Score:{evaluation.score}")
                 print(f"## Cover Letter:\n{cover_letter}")
                 print(f"## Feedback:\n{evaluation.feedback}")
-                # print(f"## Updated system prompt:\n{self.updated_system_prompt}")
-                self.updated_system_prompt = self.system_prompt;
+                self.updated_system_prompt = self.system_prompt
                 if self.include_feedback:
-                    return cover_letter + "\n\n\n" + evaluation.feedback;
+                    return cover_letter + "\n\n\n" + evaluation.feedback
                 return cover_letter
-            else:
-                eval_counter += 1
-                print("Failed evaluation - retrying")
-                print(f"## Score:{evaluation.score}")
-                print(f"## Cover Letter:\n{cover_letter}")
-                print(f"## Feedback:\n{evaluation.feedback}")
-                cover_letter = self.run(self.update_system_prompt(cover_letter, evaluation.feedback), job_info)
-                if evaluation.score > max_score:
-                    max_score = evaluation.score
-                    best_cover_letter = cover_letter
-        print("Failed evaluation - returning reply")
-        print(f"## Score:{evaluation.score}")
-        print(f"## Cover Letter:\n{cover_letter}")
-        print(f"## Feedback:\n{evaluation.feedback}")
-        if self.include_feedback:
-            return best_cover_letter + "\n\n\n" + evaluation.feedback;
+
+            print("Failed evaluation - retrying")
+            print(f"## Score:{evaluation.score}")
+            print(f"## Cover Letter:\n{cover_letter}")
+            print(f"## Feedback:\n{evaluation.feedback}")
+
+            if evaluation.score > max_score:
+                max_score = evaluation.score
+                best_cover_letter = cover_letter
+                best_feedback = evaluation.feedback
+
+            eval_counter += 1
+            if eval_counter >= self.eval_limit:
+                break
+
+            cover_letter = self.run(
+                self.update_system_prompt(cover_letter, evaluation.feedback),
+                job_info,
+            )
+
+        print("Failed evaluation - returning best-scoring attempt")
+        if last_evaluation is not None:
+            print(f"## Best score (across attempts):{max_score}")
+            print(f"## Cover Letter:\n{best_cover_letter}")
+            print(f"## Feedback (for that attempt):\n{best_feedback}")
+        if self.include_feedback and best_feedback:
+            return best_cover_letter + "\n\n\n" + best_feedback
         return best_cover_letter
 
     def convert_cover_letter_to_pdf(self, cover_letter_text):
