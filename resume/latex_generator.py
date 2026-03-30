@@ -1,4 +1,4 @@
-"""Build resume .tex from JSON + `resources/resume_original.tex`.
+"""Build resume .tex from JSON + a LaTeX template (path from ``APP_CONFIG``).
 
 The template contains paired markers (one pair per injectable region):
 
@@ -15,8 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from models import ResumeData
-
-_TEMPLATE_PATH = Path(__file__).resolve().parent / "resources" / "resume_original.tex"
+from utils import APP_CONFIG
 
 
 def _line_start(s: str, idx: int) -> int:
@@ -69,27 +68,28 @@ class LatexGenerator:
         return r"\href{" + link + r"}{\large{\underline{" + self._e(label) + r"}}}"
 
     def convert_json_to_latex(self, resume_data: ResumeData) -> str | None:
+        template_path = Path(APP_CONFIG["resume_original_tex"])
         try:
-            tex = _TEMPLATE_PATH.read_text(encoding="utf-8")
+            tex = template_path.read_text(encoding="utf-8")
         except OSError as e:
-            print(f"Error reading resume template {_TEMPLATE_PATH}: {e}")
+            print(f"Error reading resume template {template_path}: {e}")
             return None
 
         try:
             tex = _replace_marked_block(
-                tex, "profile", self._render_profile(resume_data), path=_TEMPLATE_PATH
+                tex, "profile", self._render_profile(resume_data), path=template_path
             )
             tex = _replace_marked_block(
-                tex, "projects", self._render_projects(resume_data), path=_TEMPLATE_PATH
+                tex, "projects", self._render_projects(resume_data), path=template_path
             )
             tex = _replace_marked_block(
-                tex, "skills", self._render_skills(resume_data), path=_TEMPLATE_PATH
+                tex, "skills", self._render_skills(resume_data), path=template_path
             )
             tex = _replace_marked_block(
                 tex,
                 "experience",
                 self._render_experience(resume_data),
-                path=_TEMPLATE_PATH,
+                path=template_path,
             )
             return tex
         except ValueError as e:

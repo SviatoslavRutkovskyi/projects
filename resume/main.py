@@ -18,9 +18,6 @@ class Main:
                 name = "Sviatoslav Rutkovskyi", 
                 eval_limit = 10,
                 config_file: str = "resources/app_config.json",
-                cover_letter_system_prompt = "",
-                cover_letter_evaluator_prompt = "",
-                resume_system_prompt = "",
                 include_feedback = False
                 ):
         validate_app_config(config_file)
@@ -28,16 +25,13 @@ class Main:
         # Use empty.pdf for consistent file component sizing
         self.empty_file_path = APP_CONFIG["empty_pdf"]
 
-        self.resume_builder = Resume(
-            creator_model=creator_model,
-            system_prompt=resume_system_prompt)
+        self.resume_builder = Resume(creator_model=creator_model)
         self.cover_letter_builder = CoverLetter(
-            evaluator_model=evaluator_model, 
-            name = name, 
-            eval_limit = eval_limit,
-            system_prompt = cover_letter_system_prompt,
-            evaluator_prompt = cover_letter_evaluator_prompt,
-            include_feedback = include_feedback)
+            evaluator_model=evaluator_model,
+            name=name,
+            eval_limit=eval_limit,
+            include_feedback=include_feedback,
+        )
         self.question_answerer = QuestionAnswerer(
             creator_model=creator_model,
             name=name)

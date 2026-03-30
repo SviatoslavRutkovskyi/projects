@@ -14,12 +14,12 @@ DEFAULT_OUTPUT_DIR = "static/output"
 
 
 class Resume:
-    """Resume tailoring class.""" 
-    def __init__(self, 
-                creator_model = "gpt-5-mini", 
-                system_prompt = "",
-                temperature = 0.3,
-                ):
+    """Resume tailoring class."""
+    def __init__(
+        self,
+        creator_model="gpt-5-mini",
+        temperature=0.3,
+    ):
         
         self.candidate_json_path = APP_CONFIG["candidate_json"]
         self.creator_model = creator_model
@@ -31,8 +31,7 @@ class Resume:
         # Load candidate data eagerly (always needed for tailoring)
         self.candidate_data = load_candidate_data(self.candidate_json_path)
         
-        # Build system prompt with static content (candidate JSON, schema, rules)
-        self.system_prompt = system_prompt if system_prompt else self._build_system_prompt()
+        self.system_prompt = self._build_system_prompt()
     
         # AI models 
         self.openai = OpenAI()

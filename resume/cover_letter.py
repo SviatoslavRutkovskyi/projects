@@ -13,17 +13,14 @@ load_dotenv(override=True)
 
 
 class CoverLetter:
-    # Can take all of the following as optional parameters.
-    # Pass in the parameters that you want to change from the default values. 
-    def __init__(self, 
-                creator_model = "gpt-4o", 
-                evaluator_model = "o4-mini", 
-                name = "Sviatoslav Rutkovskyi", 
-                eval_limit = 10,
-                system_prompt = "",
-                evaluator_prompt = "",
-                include_feedback = False
-                ):
+    def __init__(
+        self,
+        creator_model="gpt-4o",
+        evaluator_model="o4-mini",
+        name="Sviatoslav Rutkovskyi",
+        eval_limit=10,
+        include_feedback=False,
+    ):
 
         self.creator_model = creator_model
         self.evaluator_model = evaluator_model
@@ -39,18 +36,16 @@ class CoverLetter:
         # AI models 
         self.openai = OpenAI()
 
-        if (system_prompt == "" and evaluator_prompt == ""):
-            with open(APP_CONFIG["summary"], encoding="utf-8") as f:
-                summary = f.read()
+        with open(APP_CONFIG["summary"], encoding="utf-8") as f:
+            summary = f.read()
 
-            with open(APP_CONFIG["cover_letter_template"], encoding="utf-8") as f:
-                cover_letter_template = f.read()
+        with open(APP_CONFIG["cover_letter_template"], encoding="utf-8") as f:
+            cover_letter_template = f.read()
 
-            candidate_data = load_candidate_data(APP_CONFIG["candidate_json"])
-            candidate_json = candidate_data.model_dump_json(indent=2)
-        # System prompt - Tweak it for the best results. 
-        if (system_prompt == ""):
-            self.system_prompt =  f"""
+        candidate_data = load_candidate_data(APP_CONFIG["candidate_json"])
+        candidate_json = candidate_data.model_dump_json(indent=2)
+
+        self.system_prompt = f"""
 You are a proffesional cover letter writer, and your job is to write a cover letter for {name}, highlighting {name}'s skills, experience, and achievements. 
 You will be given a job description, and you will need to tailor the cover letter to the job description.
 Your responsibility is to represent {name} in the letter as faithfully as possible. 
@@ -72,16 +67,11 @@ Do not include the address or contact information.
 You will be evaluated, and if evalutor decides that your cover letter is not up to standart, you will be given your previus cover letter and feedback on it. 
 You have to listen to the feedback, and improve your cover letter accordingly to the feedback.
 \n\n## Summary:\n{summary}\n\n## Candidate Data:\n{candidate_json}\n\n ## Cover Letter Template:\n{cover_letter_template}\n\n
-            """
-        else:
-            self.system_prompt = system_prompt
-
+"""
 
         self.updated_system_prompt = self.system_prompt
 
-        # Evaluator prompt - Tweak it for the best results. 
-        if (evaluator_prompt == ""):            
-            self.evaluator_system_prompt = f"""
+        self.evaluator_system_prompt = f"""
 You are a professional hiring manager and cover letter evaluator.
 Your job is to determine whether a cover letter is acceptable for submission based on its professionalism, clarity, authenticity, and alignment with the job description.
 You are provided with:
@@ -106,12 +96,9 @@ Do not invent or suggest new skills that are not on the resume.
 
 Here's the information:
 \n\n## Summary:\n{summary}\n\n## Candidate Data:\n{candidate_json}\n\n ## Cover Letter Template:\n{cover_letter_template}\n\n
-                """
-# ## Cover Letter Template:\n{cover_letter_template}\n\n
-        else:
-            self.evaluator_system_prompt = evaluator_prompt
-   
+"""
 
+   
 
     def evaluator_cover_letter(self, job_info: JobDescription, cover_letter):
         formatted_job_info = job_info.model_dump_json(indent=2)

@@ -2,5 +2,6 @@
   "candidate_json": "../me/candidate.json",
   "summary": "../me/summary.txt",
   "cover_letter_template": "../me/cover_letter_template.txt",
+  "resume_original_tex": "../me/resume_original.tex",
   "empty_pdf": "resources/empty.pdf"
 }
