@@ -130,11 +130,10 @@ Return ONLY JSON per this schema:
 Rules:
 - Rewrite Profile section to emphasize alignment with the job posting (2-3 sentences, 50-100 words)
 - Reorder/trim SKILLS section to prioritize those mentioned in the job posting
-- Select 2-3 most relevant PROJECTS that match job requirements (3-4 bullet points each)
-- Select 1-2 most relevant EXPERIENCES (2-3 bullet points each)
+- Select most relevant PROJECTS that match job requirements (3-4 bullet points each)
+- Select most relevant EXPERIENCES (2-3 bullet points each)
 - Use action verbs and quantify achievements
 - Focus on results and impact
-- Ensure all dates are in "MMM YYYY" format (e.g., "Jan 2024")
 - Do not include markdown formatting or any other text/comments
 - Do not fake any information - use only information provided in the Candidate JSON"""
     
