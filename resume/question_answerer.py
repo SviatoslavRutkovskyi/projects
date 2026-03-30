@@ -1,6 +1,6 @@
 from openai import OpenAI
 from models import JobDescription, ResumeData
-from utils import load_candidate_data
+from utils import APP_CONFIG, load_candidate_data
 
 
 class QuestionAnswerer:
@@ -9,8 +9,6 @@ class QuestionAnswerer:
     def __init__(self, 
                 creator_model = "gpt-4o", 
                 name = "Sviatoslav Rutkovskyi",
-                summary_path = "../me/summary.txt",
-                candidate_json_path = "resources/candidate.json",
                 system_prompt = "",
                 temperature = 0.3
                 ):
@@ -20,8 +18,8 @@ class QuestionAnswerer:
         self.temperature = temperature
         
         # Load candidate data eagerly (always needed for answering questions)
-        summary = self._load_summary(summary_path)
-        candidate_data = load_candidate_data(candidate_json_path)
+        summary = self._load_summary(APP_CONFIG["summary"])
+        candidate_data = load_candidate_data(APP_CONFIG["candidate_json"])
         
         # Build system prompt with static content (summary, candidate data, rules)
         self.system_prompt = system_prompt if system_prompt else self._build_system_prompt(summary, candidate_data)

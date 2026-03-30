@@ -1,6 +1,5 @@
 from dotenv import load_dotenv
 from openai import OpenAI
-from pypdf import PdfReader
 import gradio as gr
 import os
 import glob
@@ -8,7 +7,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from models import Evaluation, JobDescription
-from utils import sanitize_filename
+from utils import APP_CONFIG, sanitize_filename, load_candidate_data
 
 load_dotenv(override=True)
 
@@ -21,22 +20,18 @@ class CoverLetter:
                 evaluator_model = "o4-mini", 
                 name = "Sviatoslav Rutkovskyi", 
                 eval_limit = 10,
-                summary_path = "../me/summary.txt",
-                cover_letter_path = "../me/cover_letter_template.txt",
-                resume_path = "../me/resume.pdf",
                 system_prompt = "",
                 evaluator_prompt = "",
                 include_feedback = False
                 ):
-        
-        
+
         self.creator_model = creator_model
         self.evaluator_model = evaluator_model
         self.eval_limit = eval_limit
         self.include_feedback = include_feedback
         
         # Use empty.pdf for consistent file component sizing
-        self.empty_file_path = "resources/empty.pdf"
+        self.empty_file_path = APP_CONFIG["empty_pdf"]
         
         # Store last job info for PDF filename
         self.last_job_info = None
@@ -45,26 +40,21 @@ class CoverLetter:
         self.openai = OpenAI()
 
         if (system_prompt == "" and evaluator_prompt == ""):
-            with open(summary_path, "r", encoding="utf-8") as f:
+            with open(APP_CONFIG["summary"], encoding="utf-8") as f:
                 summary = f.read()
 
-            with open(cover_letter_path, "r", encoding="utf-8") as f:
+            with open(APP_CONFIG["cover_letter_template"], encoding="utf-8") as f:
                 cover_letter_template = f.read()
 
-            reader = PdfReader(resume_path)
-            resume = ""
-
-            for page in reader.pages:
-                text = page.extract_text()
-                if text:
-                    resume += text
+            candidate_data = load_candidate_data(APP_CONFIG["candidate_json"])
+            candidate_json = candidate_data.model_dump_json(indent=2)
         # System prompt - Tweak it for the best results. 
         if (system_prompt == ""):
             self.system_prompt =  f"""
 You are a proffesional cover letter writer, and your job is to write a cover letter for {name}, highlighting {name}'s skills, experience, and achievements. 
 You will be given a job description, and you will need to tailor the cover letter to the job description.
 Your responsibility is to represent {name} in the letter as faithfully as possible. 
-You are given a summary of {name}'s background and Resume which you can use in the cover letter. 
+You are given a summary of {name}'s background and structured resume data which you can use in the cover letter. 
 You are given an example of a cover letter from {name}. Try and use a similar language and style. Do NOT include the placeholder information in the cover letter. 
 Be professional and engaging, uing the tone and style suitable for a cover letter.
 Do not make up any information, and only use the information provided.
@@ -81,7 +71,7 @@ Avoid exaggeration, emotional language, or clichés
 Do not include the address or contact information. 
 You will be evaluated, and if evalutor decides that your cover letter is not up to standart, you will be given your previus cover letter and feedback on it. 
 You have to listen to the feedback, and improve your cover letter accordingly to the feedback.
-\n\n## Summary:\n{summary}\n\n## Resume:\n{resume}\n\n ## Cover Letter Template:\n{cover_letter_template}\n\n
+\n\n## Summary:\n{summary}\n\n## Candidate Data:\n{candidate_json}\n\n ## Cover Letter Template:\n{cover_letter_template}\n\n
             """
         else:
             self.system_prompt = system_prompt
@@ -95,7 +85,7 @@ You have to listen to the feedback, and improve your cover letter accordingly to
 You are a professional hiring manager and cover letter evaluator.
 Your job is to determine whether a cover letter is acceptable for submission based on its professionalism, clarity, authenticity, and alignment with the job description.
 You are provided with:
-- The candidate’s summary and resume
+- The candidate’s summary and resume data
 - A sample cover letter from the candidate (for tone comparison)
 - The job description
 - The cover letter to evaluate
@@ -115,7 +105,7 @@ Give brief, actionable feedback (2–4 sentences) that focuses on the highest-im
 Do not invent or suggest new skills that are not on the resume.
 
 Here's the information:
-\n\n## Summary:\n{summary}\n\n## Resume:\n{resume}\n\n ## Cover Letter Template:\n{cover_letter_template}\n\n
+\n\n## Summary:\n{summary}\n\n## Candidate Data:\n{candidate_json}\n\n ## Cover Letter Template:\n{cover_letter_template}\n\n
                 """
 # ## Cover Letter Template:\n{cover_letter_template}\n\n
         else:

@@ -1,11 +1,10 @@
 from dotenv import load_dotenv
-from pypdf import PdfReader
 import gradio as gr
-import os
 from resume import Resume
 from cover_letter import CoverLetter
 from job_processor import JobProcessor
 from question_answerer import QuestionAnswerer
+from utils import APP_CONFIG, validate_app_config
 
 load_dotenv(override=True)
 
@@ -18,54 +17,30 @@ class Main:
                 evaluator_model = "o4-mini", 
                 name = "Sviatoslav Rutkovskyi", 
                 eval_limit = 10,
-                summary_path = "../me/summary.txt",
-                cover_letter_path = "../me/cover_letter_template.txt",
-                resume_path = "../me/resume.pdf",
-                candidate_json_path = "resources/candidate.json",
+                config_file: str = "resources/app_config.json",
                 cover_letter_system_prompt = "",
                 cover_letter_evaluator_prompt = "",
                 resume_system_prompt = "",
                 include_feedback = False
                 ):
-        
-        
+        validate_app_config(config_file)
+
         # Use empty.pdf for consistent file component sizing
-        self.empty_file_path = "resources/empty.pdf"
-    
+        self.empty_file_path = APP_CONFIG["empty_pdf"]
 
-
-        with open(summary_path, "r", encoding="utf-8") as f:
-            summary = f.read()
-
-        with open(cover_letter_path, "r", encoding="utf-8") as f:
-            cover_letter_template = f.read()
-
-        reader = PdfReader(resume_path)
-        resume = ""
-        for page in reader.pages:
-            text = page.extract_text()
-            if text:
-                resume += text
-   
         self.resume_builder = Resume(
-            creator_model=creator_model, 
-            candidate_json_path=candidate_json_path,
+            creator_model=creator_model,
             system_prompt=resume_system_prompt)
         self.cover_letter_builder = CoverLetter(
             evaluator_model=evaluator_model, 
             name = name, 
             eval_limit = eval_limit,
-            summary_path = summary_path,
-            cover_letter_path = cover_letter_path,
-            resume_path = resume_path,
             system_prompt = cover_letter_system_prompt,
             evaluator_prompt = cover_letter_evaluator_prompt,
             include_feedback = include_feedback)
         self.question_answerer = QuestionAnswerer(
             creator_model=creator_model,
-            name=name,
-            summary_path=summary_path,
-            candidate_json_path=candidate_json_path)
+            name=name)
         self.job_processor = JobProcessor(model=creator_model)
 
         self.launch()

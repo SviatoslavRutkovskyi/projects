@@ -6,7 +6,7 @@ import time
 import glob
 from latex_generator import LatexGenerator
 from models import ResumeData, JobDescription
-from utils import sanitize_filename, load_candidate_data
+from utils import APP_CONFIG, sanitize_filename, load_candidate_data
 
 
 # Constants
@@ -17,12 +17,11 @@ class Resume:
     """Resume tailoring class.""" 
     def __init__(self, 
                 creator_model = "gpt-5-mini", 
-                candidate_json_path = "resources/candidate.json",
                 system_prompt = "",
                 temperature = 0.3,
                 ):
         
-        self.candidate_json_path = candidate_json_path
+        self.candidate_json_path = APP_CONFIG["candidate_json"]
         self.creator_model = creator_model
         self.temperature = temperature
         self.latex_generator = LatexGenerator()
