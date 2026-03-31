@@ -1,25 +1,27 @@
 from openai import OpenAI
-from models import JobDescription, ResumeData
-from utils import APP_CONFIG, load_candidate_data
+from models import AppConfig, JobDescription, ResumeData
+from utils import load_candidate_data
 
 
 class QuestionAnswerer:
     """Class for answering interview questions from the candidate's perspective."""
     
     def __init__(self, 
+                config: AppConfig,
                 creator_model = "gpt-4o", 
                 name = "Sviatoslav Rutkovskyi",
                 system_prompt = "",
                 temperature = 0.3
                 ):
         
+        self.config = config
         self.creator_model = creator_model
         self.name = name
         self.temperature = temperature
         
         # Load candidate data eagerly (always needed for answering questions)
-        summary = self._load_summary(APP_CONFIG["summary"])
-        candidate_data = load_candidate_data(APP_CONFIG["candidate_json"])
+        summary = self._load_summary(self.config.summary)
+        candidate_data = load_candidate_data(self.config.candidate_json)
         
         # Build system prompt with static content (summary, candidate data, rules)
         self.system_prompt = system_prompt if system_prompt else self._build_system_prompt(summary, candidate_data)

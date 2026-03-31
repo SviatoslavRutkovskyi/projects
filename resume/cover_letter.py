@@ -6,8 +6,8 @@ import glob
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
-from models import Evaluation, JobDescription
-from utils import APP_CONFIG, sanitize_filename, load_candidate_data
+from models import AppConfig, Evaluation, JobDescription
+from utils import sanitize_filename, load_candidate_data
 
 load_dotenv(override=True)
 
@@ -15,6 +15,7 @@ load_dotenv(override=True)
 class CoverLetter:
     def __init__(
         self,
+        config: AppConfig,
         creator_model="gpt-4o",
         evaluator_model="o4-mini",
         name="Sviatoslav Rutkovskyi",
@@ -22,13 +23,14 @@ class CoverLetter:
         include_feedback=False,
     ):
 
+        self.config = config
         self.creator_model = creator_model
         self.evaluator_model = evaluator_model
         self.eval_limit = eval_limit
         self.include_feedback = include_feedback
         
         # Use empty.pdf for consistent file component sizing
-        self.empty_file_path = APP_CONFIG["empty_pdf"]
+        self.empty_file_path = str(self.config.empty_pdf)
         
         # Store last job info for PDF filename
         self.last_job_info = None
@@ -36,13 +38,13 @@ class CoverLetter:
         # AI models 
         self.openai = OpenAI()
 
-        with open(APP_CONFIG["summary"], encoding="utf-8") as f:
+        with open(self.config.summary, encoding="utf-8") as f:
             summary = f.read()
 
-        with open(APP_CONFIG["cover_letter_template"], encoding="utf-8") as f:
+        with open(self.config.cover_letter_template, encoding="utf-8") as f:
             cover_letter_template = f.read()
 
-        candidate_data = load_candidate_data(APP_CONFIG["candidate_json"])
+        candidate_data = load_candidate_data(self.config.candidate_json)
         candidate_json = candidate_data.model_dump_json(indent=2)
 
         self.system_prompt = f"""
@@ -122,7 +124,6 @@ Here's the information:
         messages = [
             {"role": "system", "content": self.evaluator_system_prompt},
             {"role": "user", "content": self.evaluator_cover_letter(job_info, cover_letter)},
-            {"role": "user", "content": "Reply ONLY in valid JSON: {\"is_acceptable\": true/false, \"feedback\": \"...\", \"score\": 0-100}"}
         ]
         response = self.openai.responses.parse(
             model=self.evaluator_model,

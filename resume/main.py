@@ -4,7 +4,7 @@ from resume import Resume
 from cover_letter import CoverLetter
 from job_processor import JobProcessor
 from question_answerer import QuestionAnswerer
-from utils import APP_CONFIG, validate_app_config
+from utils import validate_app_config
 
 load_dotenv(override=True)
 
@@ -20,19 +20,21 @@ class Main:
                 config_file: str = "resources/app_config.json",
                 include_feedback = False
                 ):
-        validate_app_config(config_file)
+        self.config = validate_app_config(config_file)
 
         # Use empty.pdf for consistent file component sizing
-        self.empty_file_path = APP_CONFIG["empty_pdf"]
+        self.empty_file_path = str(self.config.empty_pdf)
 
-        self.resume_builder = Resume(creator_model=creator_model)
+        self.resume_builder = Resume(config=self.config, creator_model=creator_model)
         self.cover_letter_builder = CoverLetter(
+            config=self.config,
             evaluator_model=evaluator_model,
             name=name,
             eval_limit=eval_limit,
             include_feedback=include_feedback,
         )
         self.question_answerer = QuestionAnswerer(
+            config=self.config,
             creator_model=creator_model,
             name=name)
         self.job_processor = JobProcessor(model=creator_model)

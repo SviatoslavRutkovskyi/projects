@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional
+from pathlib import Path
 
 # Resume-related models
 class SkillCategory(BaseModel):
@@ -52,3 +53,13 @@ class JobDescription(BaseModel):
     # Tone & culture for profile/CL voice
     values: list[str] = Field(default_factory=list)              # e.g., ["customer focus","collaboration"]
     culture_text: Optional[str] = None    
+
+
+class AppConfig(BaseModel):
+    """App configuration. Paths are interpreted relative to the current working directory."""
+
+    candidate_json: Path
+    summary: Path
+    cover_letter_template: Path
+    resume_original_tex: Path
+    empty_pdf: Path

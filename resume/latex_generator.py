@@ -14,8 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from models import ResumeData
-from utils import APP_CONFIG
+from models import AppConfig, ResumeData
 
 
 def _line_start(s: str, idx: int) -> int:
@@ -45,6 +44,9 @@ def _replace_marked_block(tex: str, tag: str, body: str, *, path: Path) -> str:
 
 
 class LatexGenerator:
+    def __init__(self, config: AppConfig):
+        self.config = config
+
     def escape_latex_special_chars(self, text: str) -> str:
         replacements = {
             "&": "\\&",
@@ -68,7 +70,7 @@ class LatexGenerator:
         return r"\href{" + link + r"}{\large{\underline{" + self._e(label) + r"}}}"
 
     def convert_json_to_latex(self, resume_data: ResumeData) -> str | None:
-        template_path = Path(APP_CONFIG["resume_original_tex"])
+        template_path = Path(self.config.resume_original_tex)
         try:
             tex = template_path.read_text(encoding="utf-8")
         except OSError as e:
