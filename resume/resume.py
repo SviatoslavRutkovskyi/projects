@@ -123,18 +123,14 @@ class Resume:
 Candidate JSON:
 {candidate_json}
 
-Return ONLY JSON per this schema:
-{json_schema}
-
 Rules:
-- Rewrite Profile section to emphasize alignment with the job posting (2-3 sentences, 50-100 words)
-- Reorder/trim SKILLS section to prioritize those mentioned in the job posting
-- Select most relevant PROJECTS that match job requirements (3-4 bullet points each)
-- Select most relevant EXPERIENCES (2-3 bullet points each)
-- Use action verbs and quantify achievements
-- Focus on results and impact
-- Do not include markdown formatting or any other text/comments
-- Do not fake any information - use only information provided in the Candidate JSON"""
+- Rewrite the Profile section to emphasize alignment with the job posting (2-3 sentences, 50-100 words)
+- Reorder the Skills section to prioritize skills mentioned in the job posting; drop skills clearly irrelevant to the role
+- Select 2-3 most relevant Projects; include 3-4 bullets each that best match the job requirements
+- Select 2-3 most relevant Experiences; include 2-3 bullets each that best match the job requirements
+- Prefer bullets that demonstrate measurable outcomes; do not invent or infer numbers not present in the source data
+- Do not include markdown formatting or any other text or comments
+- Use only information provided in the Candidate JSON — do not fabricate any details"""
     
     def _build_user_message(self, job_info: JobDescription, resume_feedback, use_last_resume=False):
         """Build user message with structured job information, optional last resume, and feedback."""
@@ -143,7 +139,7 @@ Rules:
         user_message = f"Job Posting Information:\n{formatted_job_info}"
         
         if use_last_resume and self.last_resume_content:
-            user_message += f"\n\nUse this resume as your starting point:\n{self.last_resume_content}"
+            user_message += f"\n\nPrevious resume output:\n{self.last_resume_content}\n\nUse this as your starting point. Preserve bullet selections and structure unless the user instructions below require changes."
         
         if resume_feedback:
             user_message += f"\n\nUser Instructions: {resume_feedback}"

@@ -1,3 +1,5 @@
+import json
+
 from openai import OpenAI
 from models import AppConfig, JobDescription, ResumeData
 from utils import load_candidate_data
@@ -6,25 +8,21 @@ from utils import load_candidate_data
 class QuestionAnswerer:
     """Class for answering interview questions from the candidate's perspective."""
     
-    def __init__(self, 
-                config: AppConfig,
-                creator_model = "gpt-4o", 
-                name = "Sviatoslav Rutkovskyi",
-                system_prompt = "",
-                temperature = 0.3
-                ):
+    def __init__(
+        self,
+        config: AppConfig,
+        creator_model="gpt-4o",
+        temperature=0.3,
+    ):
         
         self.config = config
         self.creator_model = creator_model
-        self.name = name
         self.temperature = temperature
         
-        # Load candidate data eagerly (always needed for answering questions)
-        summary = self._load_summary(self.config.summary)
+        with open(self.config.personal_summary, encoding="utf-8") as f:
+            summary = json.dumps(json.load(f), indent=2, ensure_ascii=False)
         candidate_data = load_candidate_data(self.config.candidate_json)
-        
-        # Build system prompt with static content (summary, candidate data, rules)
-        self.system_prompt = system_prompt if system_prompt else self._build_system_prompt(summary, candidate_data)
+        self.system_prompt = self._build_system_prompt(summary, candidate_data)
     
         # AI models 
         self.openai = OpenAI()
@@ -55,22 +53,17 @@ class QuestionAnswerer:
         )
         return response.choices[0].message.content
     
-    def _load_summary(self, summary_path: str) -> str:
-        """Load summary from file."""
-        with open(summary_path, "r", encoding="utf-8") as f:
-            return f.read()
-    
     def _build_system_prompt(self, summary: str, candidate_data: ResumeData):
         """Build system prompt with summary, candidate data, and rules."""
         candidate_json = candidate_data.model_dump_json(indent=2)
-        return f"""You are helping {self.name} prepare for job interviews by answering questions from their perspective.
-You will be given a job description and a question, and you need to answer the question as if you are {self.name}.
-Your responsibility is to represent {self.name} faithfully and accurately. 
-You are given a summary of {self.name}'s background and structured resume data which you can use to answer the question.
-Be professional, authentic, and specific. Use concrete examples from {self.name}'s experience when relevant.
+        return f"""You are helping {self.config.name} prepare for job interviews by answering questions from their perspective.
+You will be given a job description and a question, and you need to answer the question as if you are {self.config.name}.
+Your responsibility is to represent {self.config.name} faithfully and accurately. 
+You are given a summary of {self.config.name}'s background and structured resume data which you can use to answer the question.
+Be professional, authentic, and specific. Use concrete examples from {self.config.name}'s experience when relevant.
 Do not make up any information, and only use the information provided in the summary and candidate data.
-Focus on connecting {self.name}'s actual experiences, skills, and achievements to the question being asked.
-If the question relates to the job description, tailor your answer to show how {self.name}'s background aligns with the role.
+Focus on connecting {self.config.name}'s actual experiences, skills, and achievements to the question being asked.
+If the question relates to the job description, tailor your answer to show how {self.config.name}'s background aligns with the role.
 Keep your answers concise but comprehensive - typically 2-4 sentences for most questions, but expand if the question requires more detail.
 Respond with the answer and nothing else.
 
@@ -90,6 +83,6 @@ Respond with the answer and nothing else.
 Question to answer:
 {question}
 
-Please answer this question from {self.name}'s perspective, using information from the summary and resume provided. 
-If the question relates to the job, show how {self.name}'s background aligns with the role."""
-
+Please answer this question from {self.config.name}'s perspective, using information from the summary and resume provided. 
+If the question relates to the job, show how {self.config.name}'s background aligns with the role."""
+        

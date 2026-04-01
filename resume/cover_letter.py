@@ -1,6 +1,5 @@
 from dotenv import load_dotenv
 from openai import OpenAI
-import gradio as gr
 import os
 import glob
 from reportlab.lib.pagesizes import letter
@@ -18,7 +17,6 @@ class CoverLetter:
         config: AppConfig,
         creator_model="gpt-4o",
         evaluator_model="o4-mini",
-        name="Sviatoslav Rutkovskyi",
         eval_limit=10,
         include_feedback=False,
     ):
@@ -38,8 +36,8 @@ class CoverLetter:
         # AI models 
         self.openai = OpenAI()
 
-        with open(self.config.summary, encoding="utf-8") as f:
-            summary = f.read()
+        with open(self.config.cover_letter_example, encoding="utf-8") as f:
+            cover_letter_example = f.read()
 
         with open(self.config.cover_letter_template, encoding="utf-8") as f:
             cover_letter_template = f.read()
@@ -48,76 +46,84 @@ class CoverLetter:
         candidate_json = candidate_data.model_dump_json(indent=2)
 
         self.system_prompt = f"""
-You are a proffesional cover letter writer, and your job is to write a cover letter for {name}, highlighting {name}'s skills, experience, and achievements. 
-You will be given a job description, and you will need to tailor the cover letter to the job description.
-Your responsibility is to represent {name} in the letter as faithfully as possible. 
-You are given a summary of {name}'s background and structured resume data which you can use in the cover letter. 
-You are given an example of a cover letter from {name}. Try and use a similar language and style. Do NOT include the placeholder information in the cover letter. 
-Be professional and engaging, uing the tone and style suitable for a cover letter.
-Do not make up any information, and only use the information provided.
-Don't be too verbose, and use a 3 paragraph format.
-Avoid filler words and buzzwords such as “passionate,” “thrilled,” “dynamic,” “cutting-edge,” “fast-paced environment,” or “innovative solutions.”
-Show confidence through concrete examples, not adjectives
-Incorporate keywords and skills from the provided job description to ensure it passes an ATS scan.
-Mention technical tools, programming languages, and frameworks naturally within sentences
-Focus on relevant achievements and measurable outcomes
-Tie experiences directly to the company’s focus or mission — explain why you’re interested, but in one grounded sentence
-Respond with a cover letter and nothing else.
-Do not include the job description in the cover letter.
-Avoid exaggeration, emotional language, or clichés
-Do not include the address or contact information. 
-You will be evaluated, and if evalutor decides that your cover letter is not up to standart, you will be given your previus cover letter and feedback on it. 
-You have to listen to the feedback, and improve your cover letter accordingly to the feedback.
-\n\n## Summary:\n{summary}\n\n## Candidate Data:\n{candidate_json}\n\n ## Cover Letter Template:\n{cover_letter_template}\n\n
+You are a professional cover letter writer writing on behalf of {self.config.name}.
+
+You are given {self.config.name}'s resume data, a template showing structure, and an example showing the quality bar to meet.
+
+The template defines what goes in each section. The example shows the tone, depth, and style to match. When they conflict, follow the template for structure and the example for quality.
+
+Your goal is to produce a letter where every sentence is specific enough that it would be false if applied to a different candidate. Do not write sentences that could appear in any candidate's letter. Select the most relevant projects and experiences from the candidate data for this job — do not default to projects mentioned in the example. Address the specific requirements and focus of this role directly.
+
+- Replace all bracketed placeholders with actual values from the candidate data and job description
+- The opening line must be a claim or observation — never begin with a thesis statement like "X is a formidable challenge" or "I am applying for"
+- Do not echo the job description's language back at the reader — make specific technical connections instead
+- The [Other experience that would differentiate the candidate if present] placeholder should only be filled if a specific, non-generic connection to the role exists — otherwise omit it entirely
+- Use only information from the resume data — do not fabricate metrics, percentages, or figures not explicitly stated in the candidate data
+- Respond with cover letter text only — no preamble or commentary
+- Write between 250 and 400 words
+
+If given a rejected cover letter and feedback, treat each criticism as a specific failure mode to fix, not a suggestion to acknowledge.
+
+## Candidate Data:
+{candidate_json}
+
+## Cover Letter Template (follow this structure):
+{cover_letter_template}
+
+## Example Cover Letter (match this tone, depth, and style):
+{cover_letter_example}
 """
 
-        self.updated_system_prompt = self.system_prompt
 
         self.evaluator_system_prompt = f"""
-You are a professional hiring manager and cover letter evaluator.
-Your job is to determine whether a cover letter is acceptable for submission based on its professionalism, clarity, authenticity, and alignment with the job description.
+You are a professional hiring manager evaluating a cover letter for submission.
+Your job is to determine whether the cover letter is ready to send based on five dimensions.
+
 You are provided with:
-- The candidate’s summary and resume data
-- A sample cover letter from the candidate (for tone comparison)
+- The candidate's resume data
 - The job description
 - The cover letter to evaluate
 
-Evaluate the cover letter on the following dimensions:
-- Professionalism (0–25 pts): Grammar, tone, formatting, and flow are clear and appropriate for a job application
--Engagement & Authenticity (0–25 pts): The letter sounds human, personal, and specific to the applicant — not generic or AI-generated. Watch for overly polished, repetitive, or vague language (e.g., “passionate about innovation,” “dynamic environment,” “cutting-edge solutions”).
-- Relevance & Tailoring (0–25 pts): The letter references relevant skills, technologies, or experiences from the candidate’s resume that match the job description. It clearly connects the applicant’s background to the company’s needs.
-- Structure & Conciseness (0–25 pts): The letter follows a logical three-paragraph format (intro, body, closing) and stays under 250 words. Sentences are concise and readable.
+Opening (0–20 pts): The first sentence makes a specific claim, frames a hard problem, or leads with a strong relevant achievement tied to this role. A strong opening is one that only this candidate could have written for this job.
 
-If the letter appears AI-generated or contains unnatural phrasing (overuse of em dashes, buzzwords, or generic structure), mark it as “AI-generated” and deny it.
-Provide a short explanation describing why it seems AI-generated (e.g., “formulaic tone,” “vague enthusiasm,” “no specific details from resume”).
+Depth & Framing (0–25 pts): The letter explains why projects were built, what problem was being solved, and how technical decisions affected the user or end customer. It adds perspective the resume cannot. A strong body section shows how the candidate thinks, not just what they built.
 
-Provide a final verdict: Acceptable: true/false
-Provide a numerical score from 0 to 100.
-Give brief, actionable feedback (2–4 sentences) that focuses on the highest-impact improvements.
-Do not invent or suggest new skills that are not on the resume.
+Role Fit (0–25 pts): The letter directly engages with the specific angle of this role using only the candidate's actual experience. Evaluate how well the candidate connects what they have built to what this role requires. Do not penalize for skills or experience absent from the candidate data — only evaluate the strength of the connections that are made.
 
-Here's the information:
-\n\n## Summary:\n{summary}\n\n## Candidate Data:\n{candidate_json}\n\n ## Cover Letter Template:\n{cover_letter_template}\n\n
+Company Specificity (0–20 pts): The closing demonstrates genuine understanding of what this company does and connects it to something the candidate has built. If the job description provides limited company or technical context, evaluate whether the candidate makes a reasonable connection to what is available. Do not penalize for specificity that the job description itself cannot support.
+
+Clarity & Professionalism (0–10 pts): The letter is clean, concise, and free of errors. Word count is between 250 and 400 words. No unfilled placeholders. Uses only information present in the candidate data.
+
+Scoring rules:
+- If the letter contains any unfilled bracketed placeholders, mark acceptable: false
+- If the letter contains fabricated information not present in the candidate data, mark acceptable: false
+- If the score is above 75, mark acceptable: true
+- If the letter has clear weaknesses that can be fixed using only information present in the candidate data, provide direct specific feedback of 2-4 sentences and mark acceptable: false
+- If the letter has no clear weaknesses that can be fixed using only information present in the candidate data, mark acceptable: true
+- Do not suggest skills or experience not present in the candidate data.
+- Do not suggest adding metrics, percentages, or quantified results not present in the candidate data. If no metrics exist, evaluate whether the candidate explains the reasoning behind technical decisions.
+- If the job description provides insufficient context to identify a specific technical challenge, do not require company-specific technical connections in the closing. A reasonable connection to the company's stated focus is sufficient.
+
+## Candidate Data:
+{candidate_json}
 """
 
    
 
     def evaluator_cover_letter(self, job_info: JobDescription, cover_letter):
         formatted_job_info = job_info.model_dump_json(indent=2)
-        return f"""
-            Here's the job posting information presented by the user: \n\n{formatted_job_info}\n\n
-            Here's the cover letter generated by the agent: \n\n{cover_letter}\n\n
-            Please evaluate the response, replying with whether it is acceptable and your extensive feedback.
-            """
+        return f"Job Description:\n{formatted_job_info}\n\nCover Letter:\n{cover_letter}"
 
 
     def update_system_prompt(self, cover_letter, feedback):
-        self.updated_system_prompt = self.system_prompt + f"""
-\n\n## Previous cover letter rejected\nYou just tried to create a cover letter, but the quality control rejected your cover letter\n
-## Your attempted cover letter:\n{cover_letter}\n\n
-## Reason for rejection:\n{feedback}\n\n
-            """
-        return self.updated_system_prompt;
+        return self.system_prompt + f"""
+
+    ## Previous Attempt (rejected):
+    {cover_letter}
+
+    ## Feedback:
+    {feedback}
+    """
 
 
     def evaluate(self, job_info: JobDescription, cover_letter) -> Evaluation:
@@ -150,18 +156,15 @@ Here's the information:
         max_score = -1
         best_cover_letter = cover_letter
         best_feedback = ""
-        last_evaluation = None
         eval_counter = 0
 
         while eval_counter < self.eval_limit:
             evaluation = self.evaluate(job_info, cover_letter)
-            last_evaluation = evaluation
             if evaluation.is_acceptable:
                 print("Passed evaluation - returning reply")
                 print(f"## Score:{evaluation.score}")
                 print(f"## Cover Letter:\n{cover_letter}")
                 print(f"## Feedback:\n{evaluation.feedback}")
-                self.updated_system_prompt = self.system_prompt
                 if self.include_feedback:
                     return cover_letter + "\n\n\n" + evaluation.feedback
                 return cover_letter
@@ -177,8 +180,6 @@ Here's the information:
                 best_feedback = evaluation.feedback
 
             eval_counter += 1
-            if eval_counter >= self.eval_limit:
-                break
 
             cover_letter = self.run(
                 self.update_system_prompt(cover_letter, evaluation.feedback),
@@ -186,10 +187,9 @@ Here's the information:
             )
 
         print("Failed evaluation - returning best-scoring attempt")
-        if last_evaluation is not None:
-            print(f"## Best score (across attempts):{max_score}")
-            print(f"## Cover Letter:\n{best_cover_letter}")
-            print(f"## Feedback (for that attempt):\n{best_feedback}")
+        print(f"## Best score (across attempts):{max_score}")
+        print(f"## Cover Letter:\n{best_cover_letter}")
+        print(f"## Feedback (for that attempt):\n{best_feedback}")
         if self.include_feedback and best_feedback:
             return best_cover_letter + "\n\n\n" + best_feedback
         return best_cover_letter
@@ -225,7 +225,7 @@ Here's the information:
             # Create PDF document
             doc = SimpleDocTemplate(pdf_path, pagesize=letter,
                                   rightMargin=72, leftMargin=72,
-                                  topMargin=72, bottomMargin=18)
+                                  topMargin=72, bottomMargin=72)
             
             # Get styles
             styles = getSampleStyleSheet()

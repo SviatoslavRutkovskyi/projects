@@ -23,10 +23,10 @@ def load_app_config(config_file: str) -> AppConfig:
 def validate_app_config(config_file: str) -> AppConfig:
     """Load config JSON and verify all configured files exist."""
     cfg = load_app_config(config_file)
-    for key, value in cfg.model_dump().items():
-        pth = Path(value)
-        if not pth.is_file():
-            raise FileNotFoundError(f"Missing file for config key '{key}': {pth}")
+    for key in AppConfig.model_fields:
+        value = getattr(cfg, key)
+        if isinstance(value, Path) and not value.is_file():
+            raise FileNotFoundError(f"Missing file for config key '{key}': {value}")
     return cfg
 
 

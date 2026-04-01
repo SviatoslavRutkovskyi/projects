@@ -58,8 +58,10 @@ class JobDescription(BaseModel):
 class AppConfig(BaseModel):
     """App configuration. Paths are interpreted relative to the current working directory."""
 
+    name: str
     candidate_json: Path
-    summary: Path
     cover_letter_template: Path
     resume_original_tex: Path
     empty_pdf: Path
+    cover_letter_example: Path
+    personal_summary: Path

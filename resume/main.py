@@ -15,7 +15,6 @@ class Main:
     def __init__(self, 
                 creator_model = "gpt-4o", 
                 evaluator_model = "o4-mini", 
-                name = "Sviatoslav Rutkovskyi", 
                 eval_limit = 10,
                 config_file: str = "resources/app_config.json",
                 include_feedback = False
@@ -29,14 +28,13 @@ class Main:
         self.cover_letter_builder = CoverLetter(
             config=self.config,
             evaluator_model=evaluator_model,
-            name=name,
             eval_limit=eval_limit,
             include_feedback=include_feedback,
         )
         self.question_answerer = QuestionAnswerer(
             config=self.config,
             creator_model=creator_model,
-            name=name)
+        )
         self.job_processor = JobProcessor(model=creator_model)
 
         self.launch()
