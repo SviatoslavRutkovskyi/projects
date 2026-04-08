@@ -15,7 +15,7 @@ class CoverLetter:
     def __init__(
         self,
         config: AppConfig,
-        creator_model="gpt-4o",
+        creator_model="o4-mini",
         evaluator_model="o4-mini",
         eval_limit=10,
         include_feedback=False,
@@ -69,10 +69,10 @@ If given a rejected cover letter and feedback, treat each criticism as a specifi
 
 ## Cover Letter Template (follow this structure):
 {cover_letter_template}
-
-## Example Cover Letter (match this tone, depth, and style):
-{cover_letter_example}
 """
+# ## Example Cover Letter (match this tone, depth, and style):
+# {cover_letter_example}
+# """
 
 
         self.evaluator_system_prompt = f"""
@@ -142,9 +142,16 @@ Scoring rules:
 
     def run(self, prompt, job_info: JobDescription):
         formatted_job_info = job_info.model_dump_json(indent=2)
-        messages = [{"role": "system", "content": prompt}] + [{"role": "user", "content": formatted_job_info}]
-        response = self.openai.chat.completions.create(model=self.creator_model, messages=messages)
-        return response.choices[0].message.content
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": formatted_job_info},
+        ]
+        response = self.openai.responses.create(
+            model=self.creator_model,
+            reasoning={"effort": "medium"},
+            input=messages,
+        )
+        return response.output_text
 
 
     def request_letter(self, job_info: JobDescription):

@@ -56,23 +56,23 @@ class QuestionAnswerer:
     def _build_system_prompt(self, summary: str, candidate_data: ResumeData):
         """Build system prompt with summary, candidate data, and rules."""
         candidate_json = candidate_data.model_dump_json(indent=2)
-        return f"""You are helping {self.config.name} prepare for job interviews by answering questions from their perspective.
-You will be given a job description and a question, and you need to answer the question as if you are {self.config.name}.
-Your responsibility is to represent {self.config.name} faithfully and accurately. 
-You are given a summary of {self.config.name}'s background and structured resume data which you can use to answer the question.
-Be professional, authentic, and specific. Use concrete examples from {self.config.name}'s experience when relevant.
-Do not make up any information, and only use the information provided in the summary and candidate data.
-Focus on connecting {self.config.name}'s actual experiences, skills, and achievements to the question being asked.
-If the question relates to the job description, tailor your answer to show how {self.config.name}'s background aligns with the role.
-Keep your answers concise but comprehensive - typically 2-4 sentences for most questions, but expand if the question requires more detail.
-Respond with the answer and nothing else.
+        return f"""You are answering open-ended job application questions on behalf of {self.config.name}. Answers will be submitted directly — write in first person.
 
-## Summary:
-{summary}
+Rules:
+- Do not fabricate. Only use facts from the candidate data and personal context.
+- If the data doesn't support a full answer, say what you can honestly — do not fill gaps with generic statements.
+- If the question relates to the job description, connect {self.config.name}'s actual experience to what the role asks for.
+- Write 1-3 sentences. Be direct and human — no filler, no corporate tone, no restating the question.
+
+Respond with the answer text only.
 
 ## Candidate Data:
 {candidate_json}
+
+## Personal Context:
+{summary}
 """
+
     
     def _build_user_message(self, job_info: JobDescription, question: str):
         """Build user message with structured job information and question."""
@@ -81,8 +81,5 @@ Respond with the answer and nothing else.
 {formatted_job_info}
 
 Question to answer:
-{question}
-
-Please answer this question from {self.config.name}'s perspective, using information from the summary and resume provided. 
-If the question relates to the job, show how {self.config.name}'s background aligns with the role."""
+{question}"""
         

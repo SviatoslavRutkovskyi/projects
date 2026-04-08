@@ -1,8 +1,5 @@
-# Personal information
-me/cover_letter_template.txt
-me/resume.pdf
-me/summary.txt
-resume/resources/
+# Personal information (repo root — candidate profile, summary, resume PDF, etc.)
+me/
 resume/static/output/
 
 # Byte-compiled / optimized / DLL files
