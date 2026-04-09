@@ -134,7 +134,9 @@ Rules:
 {candidate_json}
 
 ## Line budget
-Each key below is a weight: multiply by how many of that element appear in your output, sum the products, keep that total at or under max_page_lines (in this block).
+Use the weights below to estimate your output size before finalizing selections. Sum all products.
+Your estimated_resume_lines field must equal your actual calculated total.
+If your total exceeds max_page_lines, remove content until it fits — prioritize fewer bullets over fewer sections.
 
 {self._line_estimates_prompt_text}"""
 
