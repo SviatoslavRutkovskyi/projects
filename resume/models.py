@@ -146,7 +146,7 @@ class AppConfig(BaseModel):
     name: str
     candidate_json: Path
     cover_letter_template: Path
-    resume_original_tex: Path
+    resume_template_tex: Path
     resume_layout_json: Path
     line_estimates_json: Path
     empty_pdf: Path

@@ -92,7 +92,7 @@ class LatexGenerator:
         return r"\href{" + link + r"}{\large{\underline{" + self._e(label) + r"}}}"
 
     def convert_to_latex(self, corpus: CandidateProfile, resume_data: ResumeData) -> str | None:
-        template_path = Path(self.config.resume_original_tex)
+        template_path = Path(self.config.resume_template_tex)
         try:
             tex = template_path.read_text(encoding="utf-8")
         except OSError as e:
