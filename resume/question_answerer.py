@@ -1,7 +1,7 @@
 import json
 
 from openai import OpenAI
-from models import AppConfig, JobDescription, ResumeData
+from models import AppConfig, CandidateProfile, JobDescription
 from utils import load_candidate_data
 
 
@@ -53,7 +53,7 @@ class QuestionAnswerer:
         )
         return response.choices[0].message.content
     
-    def _build_system_prompt(self, summary: str, candidate_data: ResumeData):
+    def _build_system_prompt(self, summary: str, candidate_data: CandidateProfile):
         """Build system prompt with summary, candidate data, and rules."""
         candidate_json = candidate_data.model_dump_json(indent=2)
         return f"""You are answering open-ended job application questions on behalf of {self.config.name}. Answers will be submitted directly — write in first person.

@@ -1,20 +1,20 @@
-"""Build resume .tex from JSON + a LaTeX template (path from ``APP_CONFIG``).
-
-The template contains paired markers (one pair per injectable region):
-
-    % resume-generator:begin <tag>
-    % resume-generator:end <tag>
-
-Everything from the ``begin`` line through the ``end`` line (inclusive) is
-replaced by generated LaTeX. Static content (preamble, heading, education)
-lives only in the .tex file — no duplicate bodies to maintain in Python.
-"""
+"""Build resume .tex from CandidateProfile + ResumeData and a LaTeX preamble template."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from models import AppConfig, ResumeData
+from models import (
+    AppConfig,
+    CandidateProfile,
+    CertificateEntry,
+    EducationEntry,
+    Experience,
+    Project,
+    ResumeData,
+    ResumeLayoutConfig,
+)
 
 
 def _line_start(s: str, idx: int) -> int:
@@ -28,9 +28,12 @@ def _line_end_after(s: str, idx: int) -> int:
 
 
 def _replace_marked_block(tex: str, tag: str, body: str, *, path: Path) -> str:
+    doc_start = tex.find(r"\begin{document}")
+    if doc_start == -1:
+        raise ValueError(f"Template {path} missing \\begin{{document}}")
     begin = f"% resume-generator:begin {tag}"
     end = f"% resume-generator:end {tag}"
-    i = tex.find(begin)
+    i = tex.find(begin, doc_start)
     if i == -1:
         raise ValueError(f"Template {path} missing {begin!r}")
     j = tex.find(end, i + len(begin))
@@ -43,11 +46,33 @@ def _replace_marked_block(tex: str, tag: str, body: str, *, path: Path) -> str:
     return tex[:ls] + body + tex[le:]
 
 
+def _tel_href(phone: str) -> str:
+    digits = "".join(c for c in phone if c.isdigit())
+    return digits if digits else phone
+
+
+def _resolve(source: list, selected_ids: list[int]) -> list:
+    """Return source items whose .id appears in selected_ids, in selection order."""
+    by_id = {item.id: item for item in source}
+    return [by_id[i] for i in selected_ids if i in by_id]
+
+
+def _resolve_text(items: list, selected_ids: list[int]) -> list[str]:
+    """Return .text values whose .id appears in selected_ids, in selection order."""
+    by_id = {b.id: b.text for b in items}
+    return [by_id[i] for i in selected_ids if i in by_id]
+
+
+
 class LatexGenerator:
     def __init__(self, config: AppConfig):
         self.config = config
+        layout_path = Path(self.config.resume_layout_json)
+        with open(layout_path, encoding="utf-8") as f:
+            self.layout = ResumeLayoutConfig.model_validate(json.load(f))
 
-    def escape_latex_special_chars(self, text: str) -> str:
+    def _e(self, text: str) -> str:
+        # Escape plain text from JSON so LaTeX special chars are literal.
         replacements = {
             "&": "\\&",
             "%": "\\%",
@@ -63,13 +88,10 @@ class LatexGenerator:
             text = text.replace(char, replacement)
         return text
 
-    def _e(self, text: str) -> str:
-        return self.escape_latex_special_chars(text)
-
     def _github_link_tex(self, link: str, label: str) -> str:
         return r"\href{" + link + r"}{\large{\underline{" + self._e(label) + r"}}}"
 
-    def convert_json_to_latex(self, resume_data: ResumeData) -> str | None:
+    def convert_to_latex(self, corpus: CandidateProfile, resume_data: ResumeData) -> str | None:
         template_path = Path(self.config.resume_original_tex)
         try:
             tex = template_path.read_text(encoding="utf-8")
@@ -77,43 +99,127 @@ class LatexGenerator:
             print(f"Error reading resume template {template_path}: {e}")
             return None
 
+        body = self._build_body(corpus, resume_data)
         try:
-            tex = _replace_marked_block(
-                tex, "profile", self._render_profile(resume_data), path=template_path
-            )
-            tex = _replace_marked_block(
-                tex, "projects", self._render_projects(resume_data), path=template_path
-            )
-            tex = _replace_marked_block(
-                tex, "skills", self._render_skills(resume_data), path=template_path
-            )
-            tex = _replace_marked_block(
-                tex,
-                "experience",
-                self._render_experience(resume_data),
-                path=template_path,
-            )
-            return tex
+            return _replace_marked_block(tex, "body", body, path=template_path)
         except ValueError as e:
             print(f"Error creating LaTeX content: {e}")
             return None
 
-    def _render_profile(self, data: ResumeData) -> str:
+    def _build_body(self, corpus: CandidateProfile, data: ResumeData) -> str:
+        parts: list[str] = [self._render_header(corpus), self._render_ordered_sections(corpus, data)]
+        return "\n".join(p for p in parts if p)
+
+    def _render_header(self, corpus: CandidateProfile) -> str:
+        p = corpus.personal
+        lines: list[str] = [r"\begin{center}", r"    {\Huge \scshape " + self._e(p.name) + r"} \\ \vspace{1pt}"]
+
+        if p.location:
+            lines.append("    " + self._e(p.location) + r" \\ \vspace{1pt}")
+
+        contact_bits: list[str] = []
+        if p.phone:
+            tel = _tel_href(p.phone)
+            contact_bits.append(
+                r"\href{tel:" + tel + r"}{ \raisebox{-0.1\height}\faPhone\ \underline{" + self._e(p.phone) + r"}}"
+            )
+        if p.email:
+            contact_bits.append(
+                r"\href{mailto:"
+                + p.email
+                + r"}{\raisebox{-0.2\height}\faEnvelope\  \underline{"
+                + self._e(p.email)
+                + r"}}"
+            )
+        if p.linkedin_url:
+            label = p.linkedin_label or "LinkedIn"
+            contact_bits.append(
+                r"\href{"
+                + p.linkedin_url
+                + r"}{\raisebox{-0.2\height}\faLinkedinSquare\ \underline{"
+                + self._e(label)
+                + r"}}"
+            )
+
+        if contact_bits:
+            lines.append(r"    \small " + r" ~ ".join(contact_bits) + r" ~")
+
+        lines.extend([r"    \vspace{-8pt}", r"\end{center}", ""])
+        return "\n".join(lines)
+
+    def _render_ordered_sections(self, corpus: CandidateProfile, data: ResumeData) -> str:
+        chunks: list[str] = []
+
+        for section in self.layout.section_order:
+            if section == "profile":
+                chunks.append(self._render_profile(data.profile))
+            elif section == "education":
+                entries = _resolve(corpus.education, data.selected_education_ids)
+                if entries:
+                    chunks.append(self._render_education(entries))
+            elif section == "experience":
+                blocks = [(e, _resolve_text(e.bullet_points, se.bullet_ids))
+                          for se in data.selected_experiences
+                          for e in _resolve(corpus.experiences, [se.experience_id])]
+                blocks = [(e, b) for e, b in blocks if b]
+                if blocks:
+                    chunks.append(self._render_experience_blocks(blocks))
+            elif section == "projects":
+                blocks = [(p, _resolve_text(p.bullet_points, sp.bullet_ids))
+                          for sp in data.selected_projects
+                          for p in _resolve(corpus.projects, [sp.project_id])]
+                blocks = [(p, b) for p, b in blocks if b]
+                if blocks:
+                    chunks.append(self._render_project_blocks(blocks))
+            elif section == "skills":
+                rows = [(cat.name, _resolve_text(cat.skills, sel.skill_ids))
+                        for sel in data.selected_skills
+                        for cat in _resolve(corpus.skills, [sel.category_id])]
+                rows = [(name, names) for name, names in rows if names]
+                if rows:
+                    chunks.append(self._render_skill_section(rows))
+            elif section == "certificates":
+                certs = _resolve(corpus.certificates, data.selected_certificate_ids)
+                if certs:
+                    chunks.append(self._render_certificate_section(certs))
+        return "\n".join(chunks)
+
+    def _render_profile(self, profile: str) -> str:
         return (
             "%-----------PROFILE-----------\n"
             "\\section{PROFILE}\n"
-            f"      {{{self._e(data.profile)}}}\n"
+            f"      {{{self._e(profile)}}}\n"
         )
 
-    def _render_projects(self, data: ResumeData) -> str:
+    def _render_education(self, entries: list[EducationEntry]) -> str:
+        lines = [
+            "%-----------EDUCATION-----------",
+            r"\section{EDUCATION}",
+            r"\resumeSubHeadingListStart",
+        ]
+        for edu in entries:
+            lines.append(
+                r"    \ResumeEducationEntry{"
+                + self._e(edu.institution)
+                + "}{"
+                + self._e(edu.date_range)
+                + "}{"
+                + self._e(edu.degree_line)
+                + "}{"
+                + self._e(edu.location)
+                + "}"
+            )
+        lines.append(r"\resumeSubHeadingListEnd")
+        return "\n".join(lines) + "\n"
+
+    def _render_project_blocks(self, blocks: list[tuple[Project, list[str]]]) -> str:
         lines = [
             "%-----------PROJECTS-----------",
-            r"\vspace{+5pt}",
             r"\section{PROJECTS}",
-            r"    \vspace{-5pt}",
-            r"    \resumeSubHeadingListStart",
+            r"\vspace{6pt}",
+            r"\resumeSubHeadingListStart",
         ]
-        for project in data.projects:
+        for project, bullets in blocks:
             github_suffix = ""
             if project.github_links and project.github_link_names:
                 parts = [
@@ -123,9 +229,8 @@ class LatexGenerator:
                 github_suffix = " $|$ " + " ".join(parts)
 
             title = r"\textbf{\large{" + self._e(project.name) + "}}"
-            lines.append(r"      \resumeProjectHeading")
             lines.append(
-                "          {"
+                r"      \ResumeProjectHeadingRow{"
                 + title
                 + github_suffix
                 + "}{"
@@ -133,82 +238,87 @@ class LatexGenerator:
                 + "}"
             )
             lines.append(r"          \resumeItemListStart")
-            for bullet in project.bullet_points:
-                lines.append(
-                    r"            \resumeItem{\normalsize{"
-                    + self._e(bullet)
-                    + r"}}"
-                )
+            for bullet in bullets:
+                lines.append(r"            \ResumeBulletItem{" + self._e(bullet) + "}")
             lines.append(r"          \resumeItemListEnd")
-            lines.append(r"          \vspace{-13pt}")
 
-        lines.append(r"    \resumeSubHeadingListEnd")
+        lines.append(r"\resumeSubHeadingListEnd")
         return "\n".join(lines) + "\n"
 
-    def _render_skills(self, data: ResumeData) -> str:
+    def _render_skill_section(self, rows: list[tuple[str, list[str]]]) -> str:
+        # \small{\item{ ... }} must stay balanced in one place (not split across \newenvironment).
         lines = [
             "%-----------PROGRAMMING SKILLS-----------",
-            r"\vspace{+5pt}",
             r"\section{TECHNICAL SKILLS}",
             r" \begin{itemize}[leftmargin=0.15in, label={}]",
             r"    \small{\item{",
         ]
-        for cat in data.skills:
-            skills_list = ", ".join(self._e(s) for s in cat.skills)
+        for cat_name, skills in rows:
+            skills_list = ", ".join(self._e(s) for s in skills)
             lines.append(
-                r"     \textbf{\normalsize{"
-                + self._e(cat.name)
-                + r":}}{\normalsize{"
+                r"\ResumeSkillCategoryRow{"
+                + self._e(cat_name)
+                + "}{"
                 + skills_list
-                + r"}} \\"
+                + "}"
             )
         lines.extend(
             [
                 r"    }}",
                 r" \end{itemize}",
-                r" \vspace{-15pt}",
             ]
         )
         return "\n".join(lines) + "\n"
 
-    def _render_experience(self, data: ResumeData) -> str:
+    def _render_experience_blocks(self, blocks: list[tuple[Experience, list[str]]]) -> str:
         lines = [
             "%-----------EXPERIENCE-----------",
-            r"\vspace{+5pt}",
             r"\section{EXPERIENCE}",
-            r"  \resumeSubHeadingListStart",
+            r"\resumeSubHeadingListStart",
         ]
-        for exp in data.experiences:
-            lines.append(r"    \resumeSubheading")
+        for exp, bullets in blocks:
             lines.append(
-                "      {"
+                r"    \ResumeJobHeading{"
                 + self._e(exp.company_name)
                 + "}{"
                 + exp.start_date
                 + " -- "
                 + exp.end_date
-                + "} "
-            )
-            lines.append(
-                "      {"
+                + "}{"
                 + self._e(exp.job_title)
                 + "}{"
                 + self._e(exp.location)
                 + "}"
             )
             lines.append(r"      \resumeItemListStart")
-            for bullet in exp.bullet_points:
-                lines.append(
-                    r"        \resumeItem{\normalsize{"
-                    + self._e(bullet)
-                    + r"}}"
-                )
+            for bullet in bullets:
+                lines.append(r"        \ResumeBulletItem{" + self._e(bullet) + "}")
             lines.append(r"      \resumeItemListEnd  ")
 
-        lines.extend(
-            [
-                r"  \resumeSubHeadingListEnd",
-                r"\vspace{-12pt}",
-            ]
-        )
+        lines.append(r"\resumeSubHeadingListEnd")
         return "\n".join(lines) + "\n"
+
+    def _render_certificate_section(self, certificates: list[CertificateEntry]) -> str:
+        lines = [
+            "%-----------CERTIFICATIONS-----------",
+            r"\section{CERTIFICATIONS}",
+            r"\resumeSubHeadingListStart",
+        ]
+        for c in certificates:
+            sub = []
+            if c.issuer:
+                sub.append(self._e(c.issuer))
+            if c.date:
+                sub.append(self._e(c.date))
+            if c.details:
+                sub.append(self._e(c.details))
+            mid = ", ".join(sub)
+            lines.append(
+                r"    \ResumeCertRow{"
+                + self._e(c.name)
+                + "}{"
+                + (mid if mid else "")
+                + "}"
+            )
+        lines.extend([r"\resumeSubHeadingListEnd", ""])
+        return "\n".join(lines)

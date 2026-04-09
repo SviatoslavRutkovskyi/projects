@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 
-from models import AppConfig, ResumeData
+from models import AppConfig, CandidateProfile
 
 
 def load_app_config(config_file: str) -> AppConfig:
@@ -34,18 +34,17 @@ def sanitize_filename(name: str) -> str:
     """Sanitize a string for use in filenames."""
     if not name:
         return ""
-    # Replace spaces and special characters with underscores, keep alphanumeric
     sanitized = re.sub(r"[^\w\s-]", "", name)
     sanitized = re.sub(r"[-\s]+", "_", sanitized)
     return sanitized.lower().strip("_")
 
 
-def load_candidate_data(candidate_json_path: str | Path) -> ResumeData:
-    """Load and validate candidate data from JSON file using ResumeData model."""
+def load_candidate_data(candidate_json_path: str | Path) -> CandidateProfile:
+    """Load and validate candidate profile JSON."""
     try:
-        with open(candidate_json_path, "r", encoding="utf-8") as f:
+        with open(candidate_json_path, encoding="utf-8") as f:
             data = json.load(f)
-            return ResumeData(**data)
+            return CandidateProfile.model_validate(data)
     except FileNotFoundError:
         print(f"Error: Candidate JSON file not found at {candidate_json_path}")
         raise
@@ -54,5 +53,5 @@ def load_candidate_data(candidate_json_path: str | Path) -> ResumeData:
         raise
     except Exception as e:
         print(f"Error: Invalid candidate data structure: {e}")
-        print("Expected format matches ResumeData schema (profile, skills, projects, experiences)")
+        print("Expected format matches CandidateProfile schema.")
         raise
