@@ -12,7 +12,7 @@ class QuestionAnswerer:
         self,
         config: AppConfig,
         creator_model="gpt-4o",
-        temperature=0.3,
+        temperature=0.5,
     ):
         
         self.config = config
@@ -49,7 +49,6 @@ class QuestionAnswerer:
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": user_message}
             ],
-            temperature=self.temperature,
         )
         return response.choices[0].message.content
     

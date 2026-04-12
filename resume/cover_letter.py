@@ -1,4 +1,3 @@
-from dotenv import load_dotenv
 from openai import OpenAI
 import os
 import glob
@@ -8,7 +7,6 @@ from reportlab.lib.styles import getSampleStyleSheet
 from models import AppConfig, Evaluation, JobDescription
 from utils import sanitize_filename, load_candidate_data
 
-load_dotenv(override=True)
 
 
 class CoverLetter:
@@ -36,11 +34,8 @@ class CoverLetter:
         # AI models 
         self.openai = OpenAI()
 
-        with open(self.config.cover_letter_example, encoding="utf-8") as f:
-            cover_letter_example = f.read()
-
         with open(self.config.cover_letter_template, encoding="utf-8") as f:
-            cover_letter_template = f.read()
+            self.cover_letter_template = f.read()
 
         candidate_data = load_candidate_data(self.config.candidate_json)
         candidate_json = candidate_data.model_dump_json(indent=2)
@@ -48,31 +43,18 @@ class CoverLetter:
         self.system_prompt = f"""
 You are a professional cover letter writer writing on behalf of {self.config.name}.
 
-You are given {self.config.name}'s resume data, a template showing structure, and an example showing the quality bar to meet.
+You are given {self.config.name}'s resume data and a job description.
 
-The template defines what goes in each section. The example shows the tone, depth, and style to match. When they conflict, follow the template for structure and the example for quality.
-
-Your goal is to produce a letter where every sentence is specific enough that it would be false if applied to a different candidate. Do not write sentences that could appear in any candidate's letter. Select the most relevant projects and experiences from the candidate data for this job — do not default to projects mentioned in the example. Address the specific requirements and focus of this role directly.
-
-- Replace all bracketed placeholders with actual values from the candidate data and job description
-- The opening line must be a claim or observation — never begin with a thesis statement like "X is a formidable challenge" or "I am applying for"
-- Do not echo the job description's language back at the reader — make specific technical connections instead
-- The [Other experience that would differentiate the candidate if present] placeholder should only be filled if a specific, non-generic connection to the role exists — otherwise omit it entirely
-- Use only information from the resume data — do not fabricate metrics, percentages, or figures not explicitly stated in the candidate data
+- Select the most relevant projects and experiences for this specific role
+- Use only information from the candidate data — do not fabricate metrics, percentages, or figures not present in the data
 - Respond with cover letter text only — no preamble or commentary
-- Write between 250 and 400 words
+- Write between 200 and 300 words
 
 If given a rejected cover letter and feedback, treat each criticism as a specific failure mode to fix, not a suggestion to acknowledge.
 
 ## Candidate Data:
 {candidate_json}
-
-## Cover Letter Template (follow this structure):
-{cover_letter_template}
 """
-# ## Example Cover Letter (match this tone, depth, and style):
-# {cover_letter_example}
-# """
 
 
         self.evaluator_system_prompt = f"""
@@ -84,46 +66,38 @@ You are provided with:
 - The job description
 - The cover letter to evaluate
 
-Opening (0–20 pts): The first sentence makes a specific claim, frames a hard problem, or leads with a strong relevant achievement tied to this role. A strong opening is one that only this candidate could have written for this job.
+Opening (0–20 pts): The opening connects the candidate's background to this specific role. A strong opening references something concrete from the candidate's experience and ties it to the role or company. A weak opening is purely generic and could have been written by any applicant.
 
-Depth & Framing (0–25 pts): The letter explains why projects were built, what problem was being solved, and how technical decisions affected the user or end customer. It adds perspective the resume cannot. A strong body section shows how the candidate thinks, not just what they built.
+Depth & Framing (0–25 pts): The letter explains why projects were built, what problem was being solved, and how technical decisions affected the user or end customer. It adds perspective the resume cannot. A strong body shows how the candidate thinks, not just what they built. A weak body lists technologies and actions without explaining purpose or impact.
 
 Role Fit (0–25 pts): The letter directly engages with the specific angle of this role using only the candidate's actual experience. Evaluate how well the candidate connects what they have built to what this role requires. Do not penalize for skills or experience absent from the candidate data — only evaluate the strength of the connections that are made.
 
 Company Specificity (0–20 pts): The closing demonstrates genuine understanding of what this company does and connects it to something the candidate has built. If the job description provides limited company or technical context, evaluate whether the candidate makes a reasonable connection to what is available. Do not penalize for specificity that the job description itself cannot support.
 
-Clarity & Professionalism (0–10 pts): The letter is clean, concise, and free of errors. Word count is between 250 and 400 words. No unfilled placeholders. Uses only information present in the candidate data.
+Clarity & Professionalism (0–10 pts): The letter is clean, concise, and free of errors. No unfilled placeholders. Uses only information present in the candidate data.
+
+Before scoring, verify every outcome or result claim in the letter against the candidate data:
+1. Identify each claim of outcome, impact, or result in the letter
+2. Find the corresponding project or experience in the candidate data
+3. If the claim cannot be traced directly to the candidate data, it is fabrication — quote what the candidate data actually says about that project and include it in your feedback so the generator can use accurate information instead
+Mark acceptable: false if any fabrication is found.
+
 
 Scoring rules:
-- If the letter contains any unfilled bracketed placeholders, mark acceptable: false
-- If the letter contains fabricated information not present in the candidate data, mark acceptable: false
-- If the score is above 75, mark acceptable: true
-- If the letter has clear weaknesses that can be fixed using only information present in the candidate data, provide direct specific feedback of 2-4 sentences and mark acceptable: false
-- If the letter has no clear weaknesses that can be fixed using only information present in the candidate data, mark acceptable: true
-- Do not suggest skills or experience not present in the candidate data.
-- Do not suggest adding metrics, percentages, or quantified results not present in the candidate data. If no metrics exist, evaluate whether the candidate explains the reasoning behind technical decisions.
-- If the job description provides insufficient context to identify a specific technical challenge, do not require company-specific technical connections in the closing. A reasonable connection to the company's stated focus is sufficient.
+- If the letter has clear fixable weaknesses, provide direct feedback of 2-4 sentences ordered by impact and mark acceptable: false
+- Otherwise mark acceptable: true
+- Do not suggest skills or experience not present in the candidate data
+- Do not suggest adding metrics, percentages, or quantified results not present in the candidate data. If no metrics exist, evaluate whether the candidate explains the reasoning behind technical decisions
+- If the job description provides insufficient context to identify a specific technical challenge, do not require company-specific technical connections in the closing. A reasonable connection to the company's stated focus is sufficient
 
 ## Candidate Data:
 {candidate_json}
 """
 
-   
 
     def evaluator_cover_letter(self, job_info: JobDescription, cover_letter):
         formatted_job_info = job_info.model_dump_json(indent=2)
         return f"Job Description:\n{formatted_job_info}\n\nCover Letter:\n{cover_letter}"
-
-
-    def update_system_prompt(self, cover_letter, feedback):
-        return self.system_prompt + f"""
-
-    ## Previous Attempt (rejected):
-    {cover_letter}
-
-    ## Feedback:
-    {feedback}
-    """
 
 
     def evaluate(self, job_info: JobDescription, cover_letter) -> Evaluation:
@@ -140,11 +114,10 @@ Scoring rules:
         return response.output_parsed
 
 
-    def run(self, prompt, job_info: JobDescription):
-        formatted_job_info = job_info.model_dump_json(indent=2)
+    def run(self, user_message: str) -> str:
         messages = [
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": formatted_job_info},
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": user_message},
         ]
         response = self.openai.responses.create(
             model=self.creator_model,
@@ -157,8 +130,14 @@ Scoring rules:
     def request_letter(self, job_info: JobDescription):
         print("Requesting cover letter")
         print(f"Job: {job_info.job_title or 'N/A'} at {job_info.company_name or 'N/A'}")
-        self.last_job_info = job_info  # Store for PDF filename
-        cover_letter = self.run(self.system_prompt, job_info)
+        self.last_job_info = job_info
+
+        job_message = "## Job Posting\n" + job_info.model_dump_json(indent=2)
+        cover_letter = self.run(
+            job_message
+            + "\n\n## Cover Letter Template (Use as starting point. Replace all bracketed placeholders with actual content from the candidate data and job description)\n"
+            + self.cover_letter_template
+        )
 
         max_score = -1
         best_cover_letter = cover_letter
@@ -189,17 +168,10 @@ Scoring rules:
             eval_counter += 1
 
             cover_letter = self.run(
-                self.update_system_prompt(cover_letter, evaluation.feedback),
-                job_info,
+                job_message
+                + "\n\n## Previous Attempt (rejected)\n" + cover_letter
+                + "\n\n## Feedback\n" + evaluation.feedback
             )
-
-        print("Failed evaluation - returning best-scoring attempt")
-        print(f"## Best score (across attempts):{max_score}")
-        print(f"## Cover Letter:\n{best_cover_letter}")
-        print(f"## Feedback (for that attempt):\n{best_feedback}")
-        if self.include_feedback and best_feedback:
-            return best_cover_letter + "\n\n\n" + best_feedback
-        return best_cover_letter
 
     def convert_cover_letter_to_pdf(self, cover_letter_text):
         """Convert cover letter text to PDF"""
@@ -262,5 +234,3 @@ Scoring rules:
         except Exception as e:
             print(f"Error creating cover letter PDF: {str(e)}")
             return None
-
- 
