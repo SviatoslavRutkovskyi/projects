@@ -5,6 +5,9 @@ import os
 import time
 import glob
 from pathlib import Path
+from uuid import uuid4
+import math
+
 
 from latex_generator import LatexGenerator
 from models import AppConfig, ResumeData, JobDescription
@@ -20,18 +23,16 @@ class Resume:
     def __init__(
         self,
         config: AppConfig,
-        creator_model="gpt-5-mini",
-        temperature=0.3,
+        creator_model="o4-mini",
     ):
         self.config = config
         self.creator_model = creator_model
-        self.temperature = temperature
         self.latex_generator = LatexGenerator(config=self.config)
 
         line_path = Path(self.config.line_estimates_json)
         self._line_estimates_prompt_text = line_path.read_text(encoding="utf-8").strip()
         try:
-            self._max_page_lines = float(json.loads(self._line_estimates_prompt_text)["max_page_lines"])
+            self._line_estimates = json.loads(self._line_estimates_prompt_text)
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
             raise ValueError(f"Invalid line estimates JSON at {line_path}: {e}") from e
 
@@ -46,7 +47,9 @@ class Resume:
     def tailor_resume(self, job_info: JobDescription, resume_feedback, use_last_resume=False):
         """Tailor resume to job posting using structured job information."""
         start_time = time.time()
-        print(f"[1/4] Tailoring resume...")
+        run_id = uuid4()
+        print(f"[tailor_resume called] run_id={run_id}")
+        print(f"[1/5] Tailoring resume...")
         if use_last_resume and self.last_resume_content:
             print("    Using last resume as base for tailoring")
         elif use_last_resume and not self.last_resume_content:
@@ -54,16 +57,30 @@ class Resume:
 
         user_message = self._build_user_message(job_info, resume_feedback, use_last_resume)
         elapsed = time.time() - start_time
-        print(f"[2/4] Generating tailored resume content... ({elapsed:.1f}s elapsed)")
+        print(f"[2/5] Generating tailored resume content... ({elapsed:.1f}s elapsed)")
         resume_data = self.run(self.system_prompt, user_message)
 
-        print(
-            f"    Model-estimated resume length: {resume_data.estimated_resume_lines:.1f} lines "
-            f"(informal budget {self._max_page_lines:.1f} lines)"
-        )
+        elapsed = time.time() - start_time
+        print(f"[3/5] Verifying resume length... ({elapsed:.1f}s elapsed)")
+        for i in range(5):
+            lines_calculated = self.calculate_resume_lines(resume_data, self._line_estimates)
+            print(
+            f"    Model-estimated resume length: {resume_data.estimated_resume_lines} lines "
+            f"(informal budget {self._line_estimates['min_page_lines']} to {self._line_estimates['max_page_lines']} lines) "
+            f"calculated lines: {lines_calculated}"
+            )
+            if lines_calculated <= self._line_estimates['max_page_lines'] and lines_calculated >= self._line_estimates['min_page_lines']:
+                break
+            elapsed = time.time() - start_time
+            print(f"[3/5] Ajdusting resume length... ({elapsed:.1f}s elapsed)")
+            resume_data = self.run(self.system_prompt, user_message + 
+            f"\n\nYour previous resume output:\n{resume_data.model_dump_json()}"
+            f"\n\nYour resume has {lines_calculated} lines, which is outside the acceptable range of {self._line_estimates['min_page_lines']} to {self._line_estimates['max_page_lines']}. "
+            f"{'Remove' if lines_calculated > self._line_estimates['max_page_lines'] else 'Add'} content until it fits.")
+        
 
         elapsed = time.time() - start_time
-        print(f"[3/4] Converting to LaTeX... ({elapsed:.1f}s elapsed)")
+        print(f"[4/5] Converting to LaTeX... ({elapsed:.1f}s elapsed)")
 
         os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True)
 
@@ -88,7 +105,7 @@ class Resume:
             f.write(latex_content)
 
         elapsed = time.time() - start_time
-        print(f"[4/4] Compiling PDF... ({elapsed:.1f}s elapsed)")
+        print(f"[5/5] Compiling PDF... ({elapsed:.1f}s elapsed)")
         result = subprocess.run(
             ["tectonic", os.path.basename(tex_path)],
             cwd=DEFAULT_OUTPUT_DIR,
@@ -115,9 +132,42 @@ class Resume:
                 {"role": "user", "content": user_message},
             ],
             text_format=ResumeData,
-            temperature=self.temperature,
+            
         )
         return response.output_parsed
+
+    def calculate_resume_lines(self, resume_data: ResumeData, estimates: dict) -> float:
+        H = estimates["section_heading_line"]
+
+        flat_sections = [
+            (resume_data.selected_education_ids,   "education_item_line"),
+            (resume_data.selected_certificate_ids, "certificate_item_line"),
+            (resume_data.selected_skills,          "skills_category_line"),  # list[SelectedSkillsCategory], counted by len
+        ]
+
+        nested_sections = [
+            (resume_data.selected_experiences, "experience_item_line", "experience_bullet_line"),
+            (resume_data.selected_projects,    "project_item_line",    "project_bullet_line"),
+        ]
+
+        total = H
+        CHARS_PER_LINE = 115  # calibrated from observed output
+
+        # In calculate_resume_lines:
+        total += math.ceil(len(resume_data.profile) / CHARS_PER_LINE)
+
+        for items, item_key in flat_sections:
+            if items:
+                total += H + len(items) * estimates[item_key]
+
+        for items, item_key, bullet_key in nested_sections:
+            if items:
+                total += H + sum(
+                    estimates[item_key] + len(item.bullet_ids) * estimates[bullet_key]
+                    for item in items
+                )
+
+        return total
 
     def _build_system_prompt(self):
         """Build system prompt with candidate JSON and line-budget file."""
@@ -136,7 +186,10 @@ Rules:
 ## Line budget
 Use the weights below to estimate your output size before finalizing selections. Sum all products.
 Your estimated_resume_lines field must equal your actual calculated total.
-If your total exceeds max_page_lines, remove content until it fits — prioritize fewer bullets over fewer sections.
+If your total exceeds max_page_lines, remove content until it is less than or equal to max_page_lines.
+If your total is less than min_page_lines, add content until it is greater than or equal to min_page_lines.
+
+If you recieve feedback stating your total number of lines, treat it as truth and adjust your output accordingly.
 
 {self._line_estimates_prompt_text}"""
 

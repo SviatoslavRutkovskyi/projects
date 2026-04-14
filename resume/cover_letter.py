@@ -13,7 +13,7 @@ class CoverLetter:
     def __init__(
         self,
         config: AppConfig,
-        creator_model="o4-mini",
+        creator_model="gpt-5-mini",
         evaluator_model="o4-mini",
         eval_limit=10,
         include_feedback=False,
@@ -155,10 +155,11 @@ Scoring rules:
                     return cover_letter + "\n\n\n" + evaluation.feedback
                 return cover_letter
 
-            print("Failed evaluation - retrying")
-            print(f"## Score:{evaluation.score}")
-            print(f"## Cover Letter:\n{cover_letter}")
-            print(f"## Feedback:\n{evaluation.feedback}")
+            else:
+                print("Failed evaluation - retrying")
+                print(f"## Score:{evaluation.score}")
+                print(f"## Cover Letter:\n{cover_letter}")
+                print(f"## Feedback:\n{evaluation.feedback}")
 
             if evaluation.score > max_score:
                 max_score = evaluation.score
