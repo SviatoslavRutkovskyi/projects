@@ -1,0 +1,10 @@
+Dear Hiring Team,
+
+[One sentence framing the hard problem this role deals with][One sentence connecting this to your exerience or something similar you've faced][One sentence on what specifically about this role or company drew your interest]
+
+[Describe what you built and why you built it, not just what it is]. [Key technical decision and outcome with specific tools and metrics if applicable.] [One sentence connecting the architecture or outcome to something the user or end customer actually experiences.] [Second project or experience if relevant — one to two sentences, specific tools and outcome.] [Other experience that would differentiate the candidate if present]
+
+[One to two sentences on what this company is building and why your background is a direct match for it — not a restatement of their mission, a specific technical connection.] [One sentence thanking them for their consideration and expressing enthusiasm for the opportunity]
+
+Sincerely,
+[Full name]

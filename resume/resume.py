@@ -50,6 +50,7 @@ class Resume:
         run_id = uuid4()
         print(f"[tailor_resume called] run_id={run_id}")
         print(f"[1/5] Tailoring resume...")
+        # TODO: update the prompt when using last resume to not duplicate last resume. 
         if use_last_resume and self.last_resume_content:
             print("    Using last resume as base for tailoring")
         elif use_last_resume and not self.last_resume_content:

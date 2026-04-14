@@ -41,9 +41,9 @@ class CoverLetter:
         candidate_json = candidate_data.model_dump_json(indent=2)
 
         self.system_prompt = f"""
-You are a professional cover letter writer writing on behalf of {self.config.name}.
+You are a professional cover letter writer writing on behalf of {candidate_data.personal.name}.
 
-You are given {self.config.name}'s resume data and a job description.
+You are given {candidate_data.personal.name}'s resume data and a job description.
 
 - Select the most relevant projects and experiences for this specific role
 - Use only information from the candidate data — do not fabricate metrics, percentages, or figures not present in the data

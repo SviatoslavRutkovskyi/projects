@@ -55,12 +55,12 @@ class QuestionAnswerer:
     def _build_system_prompt(self, summary: str, candidate_data: CandidateProfile):
         """Build system prompt with summary, candidate data, and rules."""
         candidate_json = candidate_data.model_dump_json(indent=2)
-        return f"""You are answering open-ended job application questions on behalf of {self.config.name}. Answers will be submitted directly — write in first person.
+        return f"""You are answering open-ended job application questions on behalf of {candidate_data.personal.name}. Answers will be submitted directly — write in first person.
 
 Rules:
 - Do not fabricate. Only use facts from the candidate data and personal context.
 - If the data doesn't support a full answer, say what you can honestly — do not fill gaps with generic statements.
-- If the question relates to the job description, connect {self.config.name}'s actual experience to what the role asks for.
+- If the question relates to the job description, connect {candidate_data.personal.name}'s actual experience to what the role asks for.
 - Write 1-3 sentences. Be direct and human — no filler, no corporate tone, no restating the question.
 
 Respond with the answer text only.
