@@ -1,0 +1,87 @@
+%-------------------------
+% Resume in LaTeX (preamble + macros). The generator replaces the single
+% body marker block below (do not duplicate that marker phrase in comments).
+%-------------------------
+
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage[english]{babel}
+\usepackage{microtype}
+\RequirePackage{fontawesome}
+\RequirePackage{xcolor}
+
+\definecolor{cvblue}{HTML}{0E5484}
+\definecolor{black}{HTML}{130810}
+
+\addtolength{\oddsidemargin}{-0.6in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1.19in}
+\addtolength{\topmargin}{-.7in}
+\addtolength{\textheight}{1.4in}
+
+\urlstyle{same}
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+\titleformat{\section}{
+  \scshape\raggedright\large\bfseries
+}{}{0em}{}[\color{black}\titlerule]
+\titlespacing*{\section}{0pt}{8pt}{5pt}
+
+%-------------------------
+% Custom commands
+%-------------------------
+\newcommand{\resumeSubheading}[4]{
+  \item
+    \begin{tabular*}{1.0\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{\large#1} & \textbf{\small #2} \\
+      \textit{\large#3} & \textit{\small #4} \\
+    \end{tabular*}
+}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.0in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{3pt}}
+
+\setlist[itemize]{label=$\vcenter{\hbox{\tiny$\bullet$}}$, itemsep=1pt, topsep=2pt, partopsep=0pt, parsep=0pt}
+
+%-------------------------
+% Generator per-row helpers (body content only; keeps Python output small)
+%-------------------------
+\newcommand{\ResumeBulletItem}[1]{\item\normalsize{#1}}
+
+\newcommand{\ResumeEducationEntry}[4]{\resumeSubheading{#1}{#2}{#3}{#4}}
+
+\newcommand{\ResumeJobHeading}[4]{\resumeSubheading{#1}{#2}{#3}{#4}}
+
+\newcommand{\ResumeProjectHeadingRow}[2]{%
+  \vspace{-12pt}\item
+    \begin{tabular*}{1.001\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \small#1 & \textbf{\small #2}\\
+    \end{tabular*}%
+}
+
+\newcommand{\ResumeCertRow}[2]{%
+  \item\normalsize{%
+    \textbf{\large #1}%
+    \if\relax\detokenize{#2}\relax\else\ \textemdash\ #2\fi%
+  }%
+}
+
+\newcommand{\ResumeSkillCategoryRow}[2]{%
+  \textbf{\normalsize{#1: }}{\normalsize{#2}} \\%
+}
+
+%-------------------------------------------
+\begin{document}
+
+% resume-generator:begin body
+% resume-generator:end body
+
+\end{document}
