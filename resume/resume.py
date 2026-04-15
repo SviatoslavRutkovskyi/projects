@@ -1,20 +1,17 @@
 from openai import OpenAI
 import json
 import subprocess
-import os
 import time
-import glob
+import logging
 from pathlib import Path
 from uuid import uuid4
 import math
 
-
 from latex_generator import LatexGenerator
 from models import AppConfig, ResumeData, JobDescription
-from utils import sanitize_filename, load_candidate_data
+from utils import sanitize_filename, load_candidate_data, save_output_file
 
-
-DEFAULT_OUTPUT_DIR = "static/output"
+logger = logging.getLogger(__name__)
 
 
 class Resume:
@@ -36,93 +33,122 @@ class Resume:
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
             raise ValueError(f"Invalid line estimates JSON at {line_path}: {e}") from e
 
-        self.last_resume_content = None
-
         self.candidate_data = load_candidate_data(self.config.candidate_json)
 
         self.system_prompt = self._build_system_prompt()
 
         self.openai = OpenAI()
 
-    def tailor_resume(self, job_info: JobDescription, resume_feedback, use_last_resume=False):
-        """Tailor resume to job posting using structured job information."""
+    def _fit_score(self, lines: float) -> tuple:
+        """
+        Returns a tuple score where lower is better.
+        (0, 0)       = in range (best)
+        (1, gap)     = under min (acceptable, larger gap is worse)
+        (2, gap)     = over max (worst, larger gap is worse)
+        """
+        min_l = self._line_estimates['min_page_lines']
+        max_l = self._line_estimates['max_page_lines']
+
+        if lines > max_l:
+            return (2, lines - max_l)
+        if lines < min_l:
+            return (1, min_l - lines)
+        return (0, 0)
+
+    def tailor_resume(self, job_info: JobDescription, resume_feedback, last_resume_content=None):
+        """
+        Tailor resume to job posting using structured job information.
+        Returns (pdf_path, resume_json) on success, or None on failure.
+        """
         start_time = time.time()
         run_id = uuid4()
-        print(f"[tailor_resume called] run_id={run_id}")
-        print(f"[1/5] Tailoring resume...")
-        # TODO: update the prompt when using last resume to not duplicate last resume. 
-        if use_last_resume and self.last_resume_content:
-            print("    Using last resume as base for tailoring")
-        elif use_last_resume and not self.last_resume_content:
-            print("    No previous resume available. Creating a new resume from the original template.")
+        logger.info(f"[tailor_resume called] run_id={run_id}")
+        logger.info("[1/5] Tailoring resume...")
 
-        user_message = self._build_user_message(job_info, resume_feedback, use_last_resume)
+        if last_resume_content:
+            logger.info("    Using last resume as base for tailoring")
+
+        # First attempt — full context including feedback and last resume
+        user_message = self._build_user_message(job_info, resume_feedback, last_resume_content)
         elapsed = time.time() - start_time
-        print(f"[2/5] Generating tailored resume content... ({elapsed:.1f}s elapsed)")
+        logger.info(f"[2/5] Generating tailored resume content... ({elapsed:.1f}s elapsed)")
         resume_data = self.run(self.system_prompt, user_message)
 
         elapsed = time.time() - start_time
-        print(f"[3/5] Verifying resume length... ({elapsed:.1f}s elapsed)")
+        logger.info(f"[3/5] Verifying resume length... ({elapsed:.1f}s elapsed)")
+
+        best_resume_data = resume_data
+        best_score = self._fit_score(self.calculate_resume_lines(resume_data, self._line_estimates))
+
         for i in range(5):
             lines_calculated = self.calculate_resume_lines(resume_data, self._line_estimates)
-            print(
-            f"    Model-estimated resume length: {resume_data.estimated_resume_lines} lines "
-            f"(informal budget {self._line_estimates['min_page_lines']} to {self._line_estimates['max_page_lines']} lines) "
-            f"calculated lines: {lines_calculated}"
+            score = self._fit_score(lines_calculated)
+
+            logger.info(
+                f"    Attempt {i + 1}: {lines_calculated} lines "
+                f"(model estimated: {resume_data.estimated_resume_lines}, "
+                f"range: {self._line_estimates['min_page_lines']}–{self._line_estimates['max_page_lines']})"
             )
-            if lines_calculated <= self._line_estimates['max_page_lines'] and lines_calculated >= self._line_estimates['min_page_lines']:
+
+            if score < best_score:
+                best_score = score
+                best_resume_data = resume_data
+
+            if score == (0, 0):
                 break
+
             elapsed = time.time() - start_time
-            print(f"[3/5] Ajdusting resume length... ({elapsed:.1f}s elapsed)")
-            resume_data = self.run(self.system_prompt, user_message + 
-            f"\n\nYour previous resume output:\n{resume_data.model_dump_json()}"
-            f"\n\nYour resume has {lines_calculated} lines, which is outside the acceptable range of {self._line_estimates['min_page_lines']} to {self._line_estimates['max_page_lines']}. "
-            f"{'Remove' if lines_calculated > self._line_estimates['max_page_lines'] else 'Add'} content until it fits.")
-        
+            logger.info(f"[3/5] Adjusting resume length... ({elapsed:.1f}s elapsed)")
+
+            # Retries — size correction only, no feedback re-sent
+            resume_data = self.run(
+                self.system_prompt,
+                self._build_retry_message(job_info, resume_data.model_dump_json(), lines_calculated)
+            )
+
+        # Use best result found across all attempts
+        resume_data = best_resume_data
+        final_lines = self.calculate_resume_lines(resume_data, self._line_estimates)
+
+        if self._fit_score(final_lines) != (0, 0):
+            if final_lines > self._line_estimates['max_page_lines']:
+                logger.warning(f"Resume still over page limit after retries: {final_lines} lines")
+            else:
+                logger.warning(
+                    f"Insufficient content to fill page: {final_lines} lines — returning best available"
+                )
 
         elapsed = time.time() - start_time
-        print(f"[4/5] Converting to LaTeX... ({elapsed:.1f}s elapsed)")
-
-        os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True)
-
-        for old_file in glob.glob(os.path.join(DEFAULT_OUTPUT_DIR, "resume*")):
-            os.remove(old_file)
+        logger.info(f"[4/5] Converting to LaTeX... ({elapsed:.1f}s elapsed)")
 
         company_name_sanitized = sanitize_filename(job_info.company_name) if job_info.company_name else ""
-        if company_name_sanitized:
-            filename_base = f"resume_{company_name_sanitized}"
-        else:
-            filename_base = "resume"
-
-        tex_path = os.path.join(DEFAULT_OUTPUT_DIR, f"{filename_base}.tex")
-        pdf_path = os.path.join(DEFAULT_OUTPUT_DIR, f"{filename_base}.pdf")
+        filename_base = f"resume_{company_name_sanitized}" if company_name_sanitized else "resume"
 
         latex_content = self.latex_generator.convert_to_latex(self.candidate_data, resume_data)
         if latex_content is None:
-            print("    ✗ Failed to create LaTeX from resume data")
+            logger.error("Failed to create LaTeX from resume data")
             return None
 
-        with open(tex_path, "w", encoding="utf-8") as f:
-            f.write(latex_content)
+        tex_path = save_output_file(f"{filename_base}.tex", latex_content.encode("utf-8"), prefix="resume")
+        pdf_path = tex_path.with_suffix(".pdf")
 
         elapsed = time.time() - start_time
-        print(f"[5/5] Compiling PDF... ({elapsed:.1f}s elapsed)")
+        logger.info(f"[5/5] Compiling PDF... ({elapsed:.1f}s elapsed)")
         result = subprocess.run(
-            ["tectonic", os.path.basename(tex_path)],
-            cwd=DEFAULT_OUTPUT_DIR,
+            ["tectonic", tex_path.name],
+            cwd=tex_path.parent,
             capture_output=True,
             text=True,
         )
 
         if result.returncode != 0:
-            print(f"    ✗ LaTeX compilation failed with return code {result.returncode}")
-            print("    LaTeX error details:", result.stderr)
+            logger.error(f"LaTeX compilation failed with return code {result.returncode}")
+            logger.error(f"LaTeX error details: {result.stderr}")
             return None
 
-        self.last_resume_content = resume_data.model_dump_json()
         elapsed = time.time() - start_time
-        print(f"    ✓ Resume generated successfully: {pdf_path} ({elapsed:.1f}s elapsed)")
-        return pdf_path
+        logger.info(f"Resume generated successfully: {pdf_path} ({elapsed:.1f}s elapsed)")
+        return str(pdf_path), resume_data.model_dump_json()
 
     def run(self, prompt, user_message) -> ResumeData:
         """Run API call."""
@@ -133,7 +159,6 @@ class Resume:
                 {"role": "user", "content": user_message},
             ],
             text_format=ResumeData,
-            
         )
         return response.output_parsed
 
@@ -143,7 +168,7 @@ class Resume:
         flat_sections = [
             (resume_data.selected_education_ids,   "education_item_line"),
             (resume_data.selected_certificate_ids, "certificate_item_line"),
-            (resume_data.selected_skills,          "skills_category_line"),  # list[SelectedSkillsCategory], counted by len
+            (resume_data.selected_skills,          "skills_category_line"),
         ]
 
         nested_sections = [
@@ -152,9 +177,8 @@ class Resume:
         ]
 
         total = H
-        CHARS_PER_LINE = 115  # calibrated from observed output
+        CHARS_PER_LINE = 115
 
-        # In calculate_resume_lines:
         total += math.ceil(len(resume_data.profile) / CHARS_PER_LINE)
 
         for items, item_key in flat_sections:
@@ -190,18 +214,17 @@ Your estimated_resume_lines field must equal your actual calculated total.
 If your total exceeds max_page_lines, remove content until it is less than or equal to max_page_lines.
 If your total is less than min_page_lines, add content until it is greater than or equal to min_page_lines.
 
-If you recieve feedback stating your total number of lines, treat it as truth and adjust your output accordingly.
+If you receive feedback stating your total number of lines, treat it as truth and adjust your output accordingly.
 
 {self._line_estimates_prompt_text}"""
 
-    def _build_user_message(self, job_info: JobDescription, resume_feedback, use_last_resume=False):
-        """Build user message with structured job information, optional last resume, and feedback."""
-        formatted_job_info = job_info.model_dump_json(indent=2)
-        parts = [f"## Job posting\n{formatted_job_info}"]
+    def _build_user_message(self, job_info: JobDescription, resume_feedback, last_resume_content=None):
+        """Build first-attempt message with full context: job posting, last resume, and feedback."""
+        parts = [f"## Job posting\n{job_info.model_dump_json(indent=2)}"]
 
-        if use_last_resume and self.last_resume_content:
+        if last_resume_content:
             parts.append(
-                f"## Previous resume output\n{self.last_resume_content}\n\n"
+                f"## Previous resume output\n{last_resume_content}\n\n"
                 "Use as the starting point; keep selections and bullets unless user notes require changes."
             )
 
@@ -209,3 +232,20 @@ If you recieve feedback stating your total number of lines, treat it as truth an
             parts.append(f"## User notes\n{resume_feedback}")
 
         return "\n\n".join(parts)
+
+    def _build_retry_message(self, job_info: JobDescription, previous_output: str, lines_calculated: float) -> str:
+        """Build retry message for size correction only. No feedback or last resume — those are
+        already reflected in the previous output and should not be reinterpreted."""
+        min_l = self._line_estimates['min_page_lines']
+        max_l = self._line_estimates['max_page_lines']
+        direction = "Remove" if lines_calculated > max_l else "Add"
+
+        return (
+            f"## Job posting\n{job_info.model_dump_json(indent=2)}\n\n"
+            f"## Previous attempt\n{previous_output}\n\n"
+            f"## Size correction only\n"
+            f"This attempt has {lines_calculated} lines. Acceptable range: {min_l}–{max_l} lines.\n"
+            f"{direction} content to fit. Adjust profile length or bullet count. "
+            f"Do not change which projects or experiences are included. "
+            f"Do not remove bullets that were explicitly added to satisfy user notes."
+        )

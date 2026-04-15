@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 from models import (
@@ -15,6 +16,8 @@ from models import (
     ResumeData,
     ResumeLayoutConfig,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _line_start(s: str, idx: int) -> int:
@@ -96,14 +99,14 @@ class LatexGenerator:
         try:
             tex = template_path.read_text(encoding="utf-8")
         except OSError as e:
-            print(f"Error reading resume template {template_path}: {e}")
+            logger.error(f"Error reading resume template {template_path}: {e}")
             return None
 
         body = self._build_body(corpus, resume_data)
         try:
             return _replace_marked_block(tex, "body", body, path=template_path)
         except ValueError as e:
-            print(f"Error creating LaTeX content: {e}")
+            logger.error(f"Error creating LaTeX content: {e}")
             return None
 
     def _build_body(self, corpus: CandidateProfile, data: ResumeData) -> str:

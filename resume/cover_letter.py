@@ -1,11 +1,13 @@
 from openai import OpenAI
-import os
-import glob
+import logging
+from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from models import AppConfig, Evaluation, JobDescription
-from utils import sanitize_filename, load_candidate_data
+from utils import sanitize_filename, load_candidate_data, save_output_file
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -128,8 +130,8 @@ Scoring rules:
 
 
     def request_letter(self, job_info: JobDescription):
-        print("Requesting cover letter")
-        print(f"Job: {job_info.job_title or 'N/A'} at {job_info.company_name or 'N/A'}")
+        logger.info("Requesting cover letter")
+        logger.info(f"Job: {job_info.job_title or 'N/A'} at {job_info.company_name or 'N/A'}")
         self.last_job_info = job_info
 
         job_message = "## Job Posting\n" + job_info.model_dump_json(indent=2)
@@ -147,19 +149,19 @@ Scoring rules:
         while eval_counter < self.eval_limit:
             evaluation = self.evaluate(job_info, cover_letter)
             if evaluation.is_acceptable:
-                print("Passed evaluation - returning reply")
-                print(f"## Score:{evaluation.score}")
-                print(f"## Cover Letter:\n{cover_letter}")
-                print(f"## Feedback:\n{evaluation.feedback}")
+                logger.info("Passed evaluation - returning reply")
+                logger.info(f"## Score:{evaluation.score}")
+                logger.info(f"## Cover Letter:\n{cover_letter}")
+                logger.info(f"## Feedback:\n{evaluation.feedback}")
                 if self.include_feedback:
                     return cover_letter + "\n\n\n" + evaluation.feedback
                 return cover_letter
 
             else:
-                print("Failed evaluation - retrying")
-                print(f"## Score:{evaluation.score}")
-                print(f"## Cover Letter:\n{cover_letter}")
-                print(f"## Feedback:\n{evaluation.feedback}")
+                logger.info("Failed evaluation - retrying")
+                logger.info(f"## Score:{evaluation.score}")
+                logger.info(f"## Cover Letter:\n{cover_letter}")
+                logger.info(f"## Feedback:\n{evaluation.feedback}")
 
             if evaluation.score > max_score:
                 max_score = evaluation.score
@@ -175,63 +177,40 @@ Scoring rules:
             )
 
     def convert_cover_letter_to_pdf(self, cover_letter_text):
-        """Convert cover letter text to PDF"""
+        """Convert cover letter text to PDF."""
+        if not cover_letter_text or not cover_letter_text.strip():
+            logger.warning("No cover letter text provided for PDF conversion")
+            return None
+
+        company_name = self.last_job_info.company_name if self.last_job_info else None
+        company_name_sanitized = sanitize_filename(company_name) if company_name else ""
+        filename_base = f"cover_letter_{company_name_sanitized}" if company_name_sanitized else "cover_letter"
+
         try:
-            # Check if text is empty
-            if not cover_letter_text or not cover_letter_text.strip():
-                print("No cover letter text provided for PDF conversion")
-                return None
-                
-            output_dir = "static/output"
-            os.makedirs(output_dir, exist_ok=True)
-            
-            # Remove old cover letter file (only expecting 1 cover letter file)
-            for old_file in glob.glob(os.path.join(output_dir, "cover_letter*")):
-                os.remove(old_file)
-            
-            # Create filename with company name
-            company_name = self.last_job_info.company_name if self.last_job_info else None
-            if company_name:
-                company_name_sanitized = sanitize_filename(company_name)
-                if company_name_sanitized:
-                    filename_base = f"cover_letter_{company_name_sanitized}"
-                else:
-                    filename_base = "cover_letter"
-            else:
-                filename_base = "cover_letter"
-            
-            pdf_path = os.path.join(output_dir, f"{filename_base}.pdf")
-            
-            # Create PDF document
-            doc = SimpleDocTemplate(pdf_path, pagesize=letter,
-                                  rightMargin=72, leftMargin=72,
-                                  topMargin=72, bottomMargin=72)
-            
-            # Get styles
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(
+                buffer, pagesize=letter,
+                rightMargin=72, leftMargin=72,
+                topMargin=72, bottomMargin=72,
+            )
+
             styles = getSampleStyleSheet()
-            normal_style = styles['Normal']
+            normal_style = styles["Normal"]
             normal_style.fontSize = 11
             normal_style.leading = 14
             normal_style.spaceAfter = 12
-            
-            # Build story
+
             story = []
-            
-            # Split text into paragraphs and add to story
-            paragraphs = cover_letter_text.split('\n\n')
-            for para in paragraphs:
+            for para in cover_letter_text.split("\n\n"):
                 if para.strip():
-                    # Replace single line breaks with spaces within paragraphs
-                    para = para.replace('\n', ' ')
-                    story.append(Paragraph(para, normal_style))
+                    story.append(Paragraph(para.replace("\n", " "), normal_style))
                     story.append(Spacer(1, 12))
-            
-            # Build PDF
+
             doc.build(story)
-            
-            print(f"Cover letter PDF created: {pdf_path}")
-            return pdf_path
-            
+            pdf_path = save_output_file(f"{filename_base}.pdf", buffer.getvalue(), prefix="cover_letter")
+            logger.info(f"Cover letter PDF created: {pdf_path}")
+            return str(pdf_path)
+
         except Exception as e:
-            print(f"Error creating cover letter PDF: {str(e)}")
+            logger.error(f"Error creating cover letter PDF: {e}")
             return None

@@ -1,8 +1,27 @@
 import json
+import logging
 import re
 from pathlib import Path
 
 from models import AppConfig, CandidateProfile
+
+logger = logging.getLogger(__name__)
+
+
+def save_output_file(filename: str, data: bytes, prefix: str) -> Path:
+    """
+    Save a file to output storage, first removing any existing files with the same prefix.
+    Returns the path of the saved file.
+
+    Swap this implementation for Blob Storage when moving to Azure.
+    """
+    output_dir = Path("static/output")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for old_file in output_dir.glob(f"{prefix}*"):
+        old_file.unlink()
+    path = output_dir / filename
+    path.write_bytes(data)
+    return path
 
 
 def load_app_config(config_file: str) -> AppConfig:
@@ -46,12 +65,11 @@ def load_candidate_data(candidate_json_path: str | Path) -> CandidateProfile:
             data = json.load(f)
             return CandidateProfile.model_validate(data)
     except FileNotFoundError:
-        print(f"Error: Candidate JSON file not found at {candidate_json_path}")
+        logger.error(f"Candidate JSON file not found at {candidate_json_path}")
         raise
     except json.JSONDecodeError as e:
-        print(f"Error: Invalid JSON in candidate file: {e}")
+        logger.error(f"Invalid JSON in candidate file: {e}")
         raise
     except Exception as e:
-        print(f"Error: Invalid candidate data structure: {e}")
-        print("Expected format matches CandidateProfile schema.")
+        logger.error(f"Invalid candidate data structure: {e}")
         raise
