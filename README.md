@@ -36,12 +36,26 @@ You can create an OpenAI API key [here](https://platform.openai.com/api-keys).
 
 ### 3. Configure candidate data
 
-Create a `me/` directory inside `src/` containing two files:
+The app requires two JSON files: a candidate profile and a personal summary. Example files for two different candidate types are provided in `src/you/`:
 
-- `candidate.json` — your resume data including personal info, projects, experience, education, skills, and bullet points. This is the only source of truth for the AI — nothing is fabricated beyond what is present here.
-- `personal_summary.json` — additional personal context used by the interview question answerer.
+| File                       | Description                                                            |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `candidate_CS.json`        | Example candidate — computer science / software engineering background |
+| `personal_summary_CS.json` | Personal summary for the CS example candidate                          |
+| `candidate_TR.json`        | Example candidate — skilled trades background                          |
+| `personal_summary_TR.json` | Personal summary for the trades example candidate                      |
 
-The paths to these files are configured in `src/resources/app_config.json`.
+Place your `candidate.json` and `personal_summary.json` in `src/you/` and update `src/resources/app_config.json` to point at them. Example files for a CS and trades background are provided in `src/you/` as a reference — use one directly for testing or as a starting point for your own:
+
+```json
+{
+  "candidate_json": "you/candidate_CS.json",
+  "personal_summary": "you/personal_summary_CS.json",
+  ...
+}
+```
+
+If your files contain personal information, add them to `.gitignore`.
 
 ### 4. Run the app
 
@@ -70,9 +84,11 @@ src/
 │   ├── resume_layout.json   # Section order configuration
 │   ├── line_estimates.json  # Line budget weights for page fitting
 │   └── cover_letter_template.txt  # Cover letter structure template
-└── me/                      # Your personal data (not committed to git)
-    ├── candidate.json
-    └── personal_summary.json
+└── you/                     # Example candidate data files
+    ├── candidate_CS.json
+    ├── personal_summary_CS.json
+    ├── candidate_TR.json
+    └── personal_summary_TR.json
 ```
 
 ## Known limitations
