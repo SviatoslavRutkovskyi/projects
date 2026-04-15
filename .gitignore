@@ -1,6 +1,9 @@
 # Personal information (repo root — candidate profile, summary, resume PDF, etc.)
-me/
-resume/static/output/
+src/me/
+src/static/output/
+
+# Cursor editor 
+.cursor/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
