@@ -238,14 +238,15 @@ If you receive feedback stating your total number of lines, treat it as truth an
         already reflected in the previous output and should not be reinterpreted."""
         min_l = self._line_estimates['min_page_lines']
         max_l = self._line_estimates['max_page_lines']
-        direction = "Remove" if lines_calculated > max_l else "Add"
+        if lines_calculated > max_l:
+            direction, target = "Remove", max_l
+        else:
+            direction, target = "Add", min_l
 
         return (
             f"## Job posting\n{job_info.model_dump_json(indent=2)}\n\n"
             f"## Previous attempt\n{previous_output}\n\n"
             f"## Size correction only\n"
             f"This attempt has {lines_calculated} lines. Acceptable range: {min_l}–{max_l} lines.\n"
-            f"{direction} content to fit. Adjust profile length or bullet count. "
-            f"Do not change which projects or experiences are included. "
-            f"Do not remove bullets that were explicitly added to satisfy user notes."
+            f"{direction} content equivalent to {abs(lines_calculated - target)} lines to reach the acceptable range."
         )
