@@ -117,7 +117,6 @@ Scoring rules:
         ]
         response = self.openai.responses.create(
             model=self.creator_model,
-            reasoning={"effort": "medium"},
             input=messages,
         )
         return response.output_text

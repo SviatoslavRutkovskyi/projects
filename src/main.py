@@ -4,7 +4,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from cover_letter import CoverLetter
 from job_processor import JobProcessor
@@ -90,6 +91,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+
 
 @app.exception_handler(ValueError)
 async def value_error_handler(_request: Request, exc: ValueError):
@@ -122,11 +125,7 @@ def health():
 
 @app.get("/")
 def root():
-    return {
-        "service": "job-application-assistant",
-        "docs": "/docs",
-        "health": "/health",
-    }
+    return HTMLResponse((Path("frontend") / "index.html").read_text())
 
 
 @app.post("/api/v1/job/parse", response_model=JobDescription)
@@ -180,7 +179,11 @@ def tailor_resume(body: TailorResumeBody, request: Request):
 @app.get("/api/v1/outputs/{filename}")
 def download_output(filename: str):
     path = _safe_output_path(filename)
-    return FileResponse(path, media_type="application/pdf", filename=filename)
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline"},
+    )
 
 
 @app.post("/api/v1/questions/answer", response_model=AnswerQuestionResponse)
