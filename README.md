@@ -2,6 +2,8 @@
 
 An AI-powered job application tool that generates tailored cover letters, customizes resumes to fit a single page, and answers interview questions — all from a job posting URL or pasted text.
 
+This repo now runs as a **FastAPI backend** with a **minimal static frontend** served from the same app.
+
 ## Features
 
 - **Cover letter generation** — generates a personalized cover letter using a two-model evaluator–optimizer loop. The generator produces a draft, the evaluator scores it across multiple dimensions and provides feedback, and the loop retries until the letter passes or the attempt limit is reached.
@@ -13,7 +15,7 @@ An AI-powered job application tool that generates tailored cover letters, custom
 
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) for dependency management
 - [Tectonic](https://tectonic-typesetting.github.io/en-US/install.html) for LaTeX PDF compilation (required for resume tailoring)
-- Python 3.11+
+- Python 3.12+
 - An OpenAI API key with access to `gpt-4o` and `o4-mini`
 
 ## Setup
@@ -61,23 +63,37 @@ If your files contain personal information, add them to `.gitignore`.
 
 ```bash
 cd src
-uv run main.py
+uv run python main.py
 ```
 
 The app opens in your browser at `http://127.0.0.1:7860`.
+
+- **UI**: `http://127.0.0.1:7860/`
+- **API docs (Swagger)**: `http://127.0.0.1:7860/docs`
+
+## API endpoints (v1)
+
+- `GET /health`
+- `POST /api/v1/job/parse`
+- `POST /api/v1/cover-letter`
+- `POST /api/v1/cover-letter/pdf`
+- `POST /api/v1/resume/tailor`
+- `GET /api/v1/outputs/{filename}` (PDF downloads/previews)
+- `POST /api/v1/questions/answer`
 
 ## Project structure
 
 ```
 src/
-├── main.py                  # App entry point, Gradio UI
+├── main.py                  # App entry point (FastAPI + static frontend mount)
 ├── cover_letter.py          # Cover letter generator and evaluator loop
 ├── resume.py                # Resume tailoring and page-fit enforcement
 ├── job_processor.py         # Job posting scraping and structured extraction
 ├── question_answerer.py     # Interview question answering
 ├── latex_generator.py       # LaTeX generation from resume data
-├── models.py                # Pydantic models for all data structures
+├── models.py                # Pydantic models (domain + API request/response)
 ├── utils.py                 # Shared utilities
+├── frontend/                # Minimal static UI (HTML/CSS/JS)
 ├── resources/
 │   ├── app_config.json      # File paths configuration
 │   ├── resume_template.tex  # LaTeX resume template
@@ -93,5 +109,5 @@ src/
 
 ## Known limitations
 
-- LinkedIn job posting URLs may not scrape reliably due to bot detection. Pasting the job description text directly is more reliable.
+- Some job posting URLs may not scrape reliably due to bot detection. Pasting the job description text directly is more reliable.
 - The app is currently single-user and local only.
