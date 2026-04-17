@@ -15,10 +15,10 @@ class CoverLetter:
     def __init__(
         self,
         config: AppConfig,
-        creator_model="gpt-5-mini",
-        evaluator_model="o4-mini",
-        eval_limit=10,
-        include_feedback=False,
+        creator_model: str,
+        evaluator_model: str,
+        eval_limit: int,
+        include_feedback: bool,
     ):
 
         self.config = config
@@ -26,12 +26,6 @@ class CoverLetter:
         self.evaluator_model = evaluator_model
         self.eval_limit = eval_limit
         self.include_feedback = include_feedback
-        
-        # Use empty.pdf for consistent file component sizing
-        self.empty_file_path = str(self.config.empty_pdf)
-        
-        # Store last job info for PDF filename
-        self.last_job_info = None
     
         # AI models 
         self.openai = OpenAI()
@@ -123,7 +117,6 @@ Scoring rules:
         ]
         response = self.openai.responses.create(
             model=self.creator_model,
-            reasoning={"effort": "medium"},
             input=messages,
         )
         return response.output_text
@@ -132,7 +125,6 @@ Scoring rules:
     def request_letter(self, job_info: JobDescription):
         logger.info("Requesting cover letter")
         logger.info(f"Job: {job_info.job_title or 'N/A'} at {job_info.company_name or 'N/A'}")
-        self.last_job_info = job_info
 
         job_message = "## Job Posting\n" + job_info.model_dump_json(indent=2)
         cover_letter = self.run(
@@ -176,13 +168,12 @@ Scoring rules:
                 + "\n\n## Feedback\n" + evaluation.feedback
             )
 
-    def convert_cover_letter_to_pdf(self, cover_letter_text):
+    def convert_cover_letter_to_pdf(self, cover_letter_text: str, *, company_name: str | None = None):
         """Convert cover letter text to PDF."""
         if not cover_letter_text or not cover_letter_text.strip():
             logger.warning("No cover letter text provided for PDF conversion")
             return None
 
-        company_name = self.last_job_info.company_name if self.last_job_info else None
         company_name_sanitized = sanitize_filename(company_name) if company_name else ""
         filename_base = f"cover_letter_{company_name_sanitized}" if company_name_sanitized else "cover_letter"
 
@@ -203,7 +194,14 @@ Scoring rules:
             story = []
             for para in cover_letter_text.split("\n\n"):
                 if para.strip():
-                    story.append(Paragraph(para.replace("\n", " "), normal_style))
+                    lines = para.split("\n")
+                    if len(lines) == 1:
+                        story.append(Paragraph(para.strip(), normal_style))
+                    else:
+                        # Multiple lines within one paragraph block — render each as its own paragraph
+                        for line in lines:
+                            if line.strip():
+                                story.append(Paragraph(line.strip(), normal_style))
                     story.append(Spacer(1, 12))
 
             doc.build(story)

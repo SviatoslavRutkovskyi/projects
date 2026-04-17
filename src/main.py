@@ -1,12 +1,28 @@
 import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
+
 from dotenv import load_dotenv
-import gradio as gr
-from resume import Resume
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+
 from cover_letter import CoverLetter
 from job_processor import JobProcessor
+from models import (
+    AnswerQuestionBody,
+    AnswerQuestionResponse,
+    CoverLetterPdfBody,
+    CoverLetterResponse,
+    JobDescription,
+    JobPostingBody,
+    JobContextBody,
+    TailorResumeBody,
+    TailorResumeResponse,
+)
 from question_answerer import QuestionAnswerer
+from resume import Resume
 from utils import validate_app_config
-from models import JobDescription
 
 load_dotenv(override=True)
 
@@ -17,21 +33,27 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class Main:
+OUTPUT_DIR = Path("static") / "output"
+
+
+class ApplicationServices:
+    """Wires resume, cover letter, Q&A, and job parsing (no UI)."""
+
     def __init__(
         self,
-        creator_model="gpt-4o",
-        evaluator_model="o4-mini",
-        eval_limit=10,
+        creator_model: str = "gpt-4o",
+        evaluator_model: str = "o4-mini",
+        eval_limit: int = 10,
+        fit_limit: int = 5,
         config_file: str = "resources/app_config.json",
-        include_feedback=False,
+        include_feedback: bool = False,
     ):
         self.config = validate_app_config(config_file)
-        self.empty_file_path = str(self.config.empty_pdf)
 
-        self.resume_builder = Resume(config=self.config, creator_model=creator_model)
+        self.resume_builder = Resume(config=self.config, creator_model=creator_model, fit_limit=fit_limit)
         self.cover_letter_builder = CoverLetter(
             config=self.config,
+            creator_model=creator_model,
             evaluator_model=evaluator_model,
             eval_limit=eval_limit,
             include_feedback=include_feedback,
@@ -42,156 +64,147 @@ class Main:
         )
         self.job_processor = JobProcessor(model=creator_model)
 
-        self.launch()
-
-    def _get_or_parse_job(self, job_posting: str, job_desc: JobDescription | None) -> JobDescription:
-        """Return cached job description or parse the posting if not yet parsed."""
+    def get_or_parse_job(
+        self, job_posting: str | None, job_desc: JobDescription | None
+    ) -> JobDescription:
         if job_desc is not None:
-            logger.info("Using cached job description")
+            logger.info("Using client-provided job description")
             return job_desc
+        if not job_posting or not job_posting.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Provide job_posting text/URL or a parsed job_description.",
+            )
         return self.job_processor.process_and_extract_job_info(job_posting)
 
-    def _generate_cover_letter(self, job_posting: str, job_desc: JobDescription | None):
-        job_desc = self._get_or_parse_job(job_posting, job_desc)
-        cover_letter = self.cover_letter_builder.request_letter(job_desc)
-        return cover_letter, job_desc
 
-    def _convert_cover_letter_to_pdf(self, cover_letter_text: str):
-        return self.cover_letter_builder.convert_cover_letter_to_pdf(cover_letter_text)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.services = ApplicationServices()
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    yield
 
-    def _tailor_resume(
-        self,
-        job_posting: str,
-        job_desc: JobDescription | None,
-        resume_feedback: str,
-        use_last_resume: bool,
-        last_resume: str | None,
-    ):
-        job_desc = self._get_or_parse_job(job_posting, job_desc)
-        last = last_resume if use_last_resume else None
-        result = self.resume_builder.tailor_resume(job_desc, resume_feedback, last)
-        if result is None:
-            return None, job_desc, last_resume  # keep old last_resume on failure
-        pdf_path, resume_json = result
-        return pdf_path, job_desc, resume_json
 
-    def _answer_question(
-        self,
-        job_posting: str,
-        job_desc: JobDescription | None,
-        question: str,
-    ):
-        if not question.strip():
-            return "Please enter a question.", job_desc
-        job_desc = self._get_or_parse_job(job_posting, job_desc)
-        answer = self.question_answerer.answer_question(job_desc, question)
-        return answer, job_desc
+app = FastAPI(
+    title="Job Application Assistant",
+    description="Parse job postings, generate cover letters, tailor resumes, and answer application questions.",
+    lifespan=lifespan,
+)
 
-    def launch(self):
-        with gr.Blocks(theme=gr.themes.Default(primary_hue="sky")) as ui:
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 
-            # --- Session state ---
-            job_desc_state = gr.State(None)   # holds parsed JobDescription
-            last_resume_state = gr.State(None) # holds last resume JSON
 
-            gr.Markdown("# Cover Letter Builder")
+@app.exception_handler(ValueError)
+async def value_error_handler(_request: Request, exc: ValueError):
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": str(exc)},
+    )
 
-            with gr.Row():
-                job_post_textbox = gr.Textbox(
-                    label="Paste the job posting text or URL here (URLs will be automatically scraped)",
-                    lines=20,
-                )
-                cover_letter_textbox = gr.Textbox(label="Cover Letter", lines=20)
 
-            with gr.Row():
-                run_button = gr.Button("Run", variant="primary")
-                convert_pdf_button = gr.Button("Convert to PDF", variant="secondary")
-                cover_letter_file = gr.File(
-                    label="Cover Letter PDF", value=self.empty_file_path, visible=False
-                )
+def get_services(request: Request) -> ApplicationServices:
+    return request.app.state.services
 
-            # Clear cached job description when the posting changes
-            job_post_textbox.change(fn=lambda: None, outputs=job_desc_state)
 
-            run_button.click(
-                fn=self._generate_cover_letter,
-                inputs=[job_post_textbox, job_desc_state],
-                outputs=[cover_letter_textbox, job_desc_state],
-            )
+def _safe_output_path(filename: str) -> Path:
+    if "/" in filename or "\\" in filename or filename in (".", ".."):
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+    base = OUTPUT_DIR.resolve()
+    candidate = (base / filename).resolve()
+    if not candidate.is_relative_to(base):
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+    if not candidate.is_file():
+        raise HTTPException(status_code=404, detail="File not found.")
+    return candidate
 
-            job_post_textbox.submit(
-                fn=self._generate_cover_letter,
-                inputs=[job_post_textbox, job_desc_state],
-                outputs=[cover_letter_textbox, job_desc_state],
-            )
 
-            convert_pdf_button.click(
-                fn=lambda: gr.File(value=self.empty_file_path, visible=True),
-                outputs=cover_letter_file,
-            ).then(
-                fn=self._convert_cover_letter_to_pdf,
-                inputs=cover_letter_textbox,
-                outputs=cover_letter_file,
-            )
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
-            # --- Resume tailoring ---
-            gr.Markdown("## Resume Tailoring")
-            resume_feedback_textbox = gr.Textbox(label="Resume Feedback", lines=5)
 
-            with gr.Row():
-                resume_button = gr.Button("Tailor Resume", variant="primary", scale=2)
-                use_last_resume_checkbox = gr.Checkbox(
-                    label="Use Last Resume", value=False, visible=False, scale=1
-                )
-                resume_file = gr.File(
-                    label="Tailored Resume PDF", value=self.empty_file_path, visible=False
-                )
+@app.get("/")
+def root():
+    return HTMLResponse((Path("frontend") / "index.html").read_text())
 
-            resume_button.click(
-                fn=lambda: gr.File(value=self.empty_file_path, visible=True),
-                outputs=resume_file,
-            ).then(
-                fn=self._tailor_resume,
-                inputs=[
-                    job_post_textbox,
-                    job_desc_state,
-                    resume_feedback_textbox,
-                    use_last_resume_checkbox,
-                    last_resume_state,
-                ],
-                outputs=[resume_file, job_desc_state, last_resume_state],
-            ).then(
-                fn=lambda: gr.Checkbox(visible=True),
-                outputs=use_last_resume_checkbox,
-            )
 
-            # --- Question answerer ---
-            gr.Markdown("## Interview Question Answerer")
+@app.post("/api/v1/job/parse", response_model=JobDescription)
+def parse_job(body: JobPostingBody, request: Request):
+    services = get_services(request)
+    return services.job_processor.process_and_extract_job_info(body.job_posting.strip())
 
-            with gr.Row():
-                question_textbox = gr.Textbox(
-                    label="Enter your question",
-                    lines=3,
-                    placeholder="e.g., Tell me about yourself, Why are you interested in this role?",
-                )
-                answer_textbox = gr.Textbox(label="Answer", lines=10)
 
-            answer_button = gr.Button("Answer Question", variant="primary")
+@app.post("/api/v1/cover-letter", response_model=CoverLetterResponse)
+def generate_cover_letter(body: JobContextBody, request: Request):
+    services = get_services(request)
+    job_desc = services.get_or_parse_job(body.job_posting, body.job_description)
+    cover_letter = services.cover_letter_builder.request_letter(job_desc)
+    return CoverLetterResponse(cover_letter=cover_letter, job_description=job_desc)
 
-            answer_button.click(
-                fn=self._answer_question,
-                inputs=[job_post_textbox, job_desc_state, question_textbox],
-                outputs=[answer_textbox, job_desc_state],
-            )
 
-            question_textbox.submit(
-                fn=self._answer_question,
-                inputs=[job_post_textbox, job_desc_state, question_textbox],
-                outputs=[answer_textbox, job_desc_state],
-            )
+@app.post("/api/v1/cover-letter/pdf")
+def cover_letter_pdf(body: CoverLetterPdfBody, request: Request):
+    services = get_services(request)
+    company_name = body.job_description.company_name if body.job_description else None
+    path = services.cover_letter_builder.convert_cover_letter_to_pdf(
+        body.cover_letter_text,
+        company_name=company_name,
+    )
+    if path is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not generate cover letter PDF.",
+        )
+    return FileResponse(path, media_type="application/pdf", filename=Path(path).name)
 
-        ui.launch(inbrowser=True)
+
+@app.post("/api/v1/resume/tailor", response_model=TailorResumeResponse)
+def tailor_resume(body: TailorResumeBody, request: Request):
+    services = get_services(request)
+    job_desc = services.get_or_parse_job(body.job_posting, body.job_description)
+    result = services.resume_builder.tailor_resume(job_desc, body.resume_feedback, body.last_resume_json)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Resume tailoring or PDF compilation failed.",
+        )
+    pdf_path, resume_json = result
+    return TailorResumeResponse(
+        job_description=job_desc,
+        last_resume_json=resume_json,
+        pdf_filename=Path(pdf_path).name,
+    )
+
+
+@app.get("/api/v1/outputs/{filename}")
+def download_output(filename: str):
+    path = _safe_output_path(filename)
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline"},
+    )
+
+
+@app.post("/api/v1/questions/answer", response_model=AnswerQuestionResponse)
+def answer_question(body: AnswerQuestionBody, request: Request):
+    if not body.question.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please enter a question.",
+        )
+    services = get_services(request)
+    job_desc = services.get_or_parse_job(body.job_posting, body.job_description)
+    answer = services.question_answerer.answer_question(job_desc, body.question)
+    return AnswerQuestionResponse(answer=answer, job_description=job_desc)
 
 
 if __name__ == "__main__":
-    Main()
+    import uvicorn
+
+    uvicorn.run(
+        "main:app",
+        host="127.0.0.1",
+        port=7860,
+        reload=False,
+    )

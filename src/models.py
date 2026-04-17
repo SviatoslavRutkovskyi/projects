@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Literal, Optional
 from pathlib import Path
 
@@ -148,5 +148,61 @@ class AppConfig(BaseModel):
     resume_template_tex: Path
     resume_layout_json: Path
     line_estimates_json: Path
-    empty_pdf: Path
     personal_summary: Path
+
+
+# --- API models (FastAPI request/response bodies) ---
+
+
+class JobPostingBody(BaseModel):
+    """Scrape (if URL) + extract structured fields."""
+
+    job_posting: str = Field(..., min_length=1, description="Job URL or pasted posting text.")
+
+
+class JobContextBody(BaseModel):
+    """Either send job_posting (parsed server-side) or reuse job_description from a prior call."""
+
+    job_posting: str | None = None
+    job_description: JobDescription | None = None
+
+    @model_validator(mode="after")
+    def require_job_source(self) -> "JobContextBody":
+        if self.job_description is not None:
+            return self
+        if self.job_posting is not None and self.job_posting.strip():
+            return self
+        raise ValueError("Provide job_posting or job_description.")
+
+
+class CoverLetterResponse(BaseModel):
+    cover_letter: str
+    job_description: JobDescription
+
+
+class CoverLetterPdfBody(BaseModel):
+    cover_letter_text: str = Field(..., min_length=1)
+    job_description: JobDescription | None = Field(
+        default=None,
+        description="Optional; used for PDF filename (company name).",
+    )
+
+
+class TailorResumeBody(JobContextBody):
+    resume_feedback: str = ""
+    last_resume_json: str | None = None
+
+
+class TailorResumeResponse(BaseModel):
+    job_description: JobDescription
+    last_resume_json: str
+    pdf_filename: str
+
+
+class AnswerQuestionBody(JobContextBody):
+    question: str
+
+
+class AnswerQuestionResponse(BaseModel):
+    answer: str
+    job_description: JobDescription

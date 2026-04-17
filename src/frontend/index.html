@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Job Application Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/frontend/style.css" />
+  </head>
+  <body>
+    <!-- Header -->
+    <header>
+      <span class="header-title">job-application-assistant</span>
+      <div class="job-status">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">no job loaded</span>
+      </div>
+    </header>
+
+    <!-- Action bar -->
+    <div class="action-bar">
+      <button
+        class="btn btn-primary"
+        id="btn-cover-letter"
+        onclick="runAction('cover-letter')"
+      >
+        <div class="spinner"></div>
+        <span class="btn-label">Generate Cover Letter</span>
+      </button>
+      <button
+        class="btn btn-primary"
+        id="btn-resume"
+        onclick="runAction('resume')"
+      >
+        <div class="spinner"></div>
+        <span class="btn-label">Tailor Resume</span>
+      </button>
+      <button class="btn" id="btn-answer" onclick="runAction('answer')">
+        <div class="spinner"></div>
+        <span class="btn-label">Answer Question</span>
+      </button>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <button class="tab active" onclick="switchTab('job')" id="tab-job">
+        Job Description
+      </button>
+      <button
+        class="tab"
+        onclick="switchTab('cover-letter')"
+        id="tab-cover-letter"
+      >
+        Cover Letter
+      </button>
+      <button class="tab" onclick="switchTab('resume')" id="tab-resume">
+        Resume
+      </button>
+      <button class="tab" onclick="switchTab('questions')" id="tab-questions">
+        Questions
+      </button>
+    </div>
+
+    <main>
+      <!-- Job Description tab -->
+      <div class="tab-panel active" id="panel-job">
+        <div class="card">
+          <div class="card-header">
+            <span>Job Posting</span>
+            <span class="meta-text"
+              >paste text or URL — URLs are scraped automatically</span
+            >
+          </div>
+          <div class="card-body">
+            <textarea
+              id="job-posting"
+              rows="18"
+              placeholder="Paste job description here or enter a URL..."
+              oninput="onJobPostingChange()"
+            ></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cover Letter tab -->
+      <div class="tab-panel" id="panel-cover-letter">
+        <div class="cover-letter-grid">
+          <div class="card">
+            <div class="card-header">
+              <span>Cover Letter</span>
+              <div class="flex gap-2">
+                <button
+                  class="btn btn-sm"
+                  onclick="copyText('cover-letter-text')"
+                >
+                  Copy
+                </button>
+                <button
+                  class="btn btn-sm"
+                  id="btn-edit-cl"
+                  onclick="toggleEditCoverLetter()"
+                  disabled
+                >
+                  Edit
+                </button>
+                <button
+                  class="btn btn-sm"
+                  id="btn-pdf"
+                  onclick="downloadCoverLetterPdf()"
+                  disabled
+                >
+                  <div class="spinner"></div>
+                  <span class="btn-label">Download PDF</span>
+                </button>
+              </div>
+            </div>
+            <div class="card-body" id="cover-letter-output">
+              <div class="empty-state">
+                Generate a cover letter to see it here.
+              </div>
+            </div>
+          </div>
+
+          <div class="cover-letter-actions"></div>
+        </div>
+      </div>
+
+      <!-- Resume tab -->
+      <div class="tab-panel" id="panel-resume">
+        <div class="resume-grid">
+          <div>
+            <div id="resume-preview-container">
+              <div class="pdf-placeholder" id="resume-placeholder">
+                Tailor a resume to preview it here.
+              </div>
+              <iframe
+                id="resume-iframe"
+                class="pdf-preview"
+                style="display: none"
+              ></iframe>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <div class="card">
+              <div class="card-header">Download</div>
+              <div class="card-body">
+                <a
+                  id="resume-download-link"
+                  class="btn w-full"
+                  style="
+                    text-decoration: none;
+                    justify-content: center;
+                    display: none;
+                  "
+                >
+                  Download PDF
+                </a>
+                <span class="meta-text" id="no-resume-msg">No resume yet.</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">Feedback</div>
+              <div class="card-body">
+                <span class="section-label">Optional notes for the model</span>
+                <textarea
+                  id="resume-feedback"
+                  rows="5"
+                  placeholder="e.g. Include the neural network project, focus on backend experience..."
+                ></textarea>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">Options</div>
+              <div class="card-body">
+                <label
+                  class="checkbox-label"
+                  id="use-last-resume-row"
+                  style="display: none"
+                >
+                  <input type="checkbox" id="use-last-resume" />
+                  Use last resume as base
+                </label>
+                <span class="meta-text" id="no-last-resume-msg"
+                  >No previous resume yet.</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Questions tab -->
+      <div class="tab-panel" id="panel-questions">
+        <div class="card">
+          <div class="card-header">
+            <span>Interview Questions</span>
+            <button class="btn btn-sm" onclick="addQuestion()">
+              + Add Question
+            </button>
+          </div>
+          <div class="card-body" id="qa-list"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Toast container -->
+    <div id="toast-container"></div>
+
+    <script src="/frontend/app.js" defer></script>
+  </body>
+</html>

@@ -20,11 +20,13 @@ class Resume:
     def __init__(
         self,
         config: AppConfig,
-        creator_model="o4-mini",
+        creator_model: str,
+        fit_limit: int,
     ):
         self.config = config
         self.creator_model = creator_model
         self.latex_generator = LatexGenerator(config=self.config)
+        self.fit_limit = fit_limit
 
         line_path = Path(self.config.line_estimates_json)
         self._line_estimates_prompt_text = line_path.read_text(encoding="utf-8").strip()
@@ -80,7 +82,7 @@ class Resume:
         best_resume_data = resume_data
         best_score = self._fit_score(self.calculate_resume_lines(resume_data, self._line_estimates))
 
-        for i in range(5):
+        for i in range(self.fit_limit):
             lines_calculated = self.calculate_resume_lines(resume_data, self._line_estimates)
             score = self._fit_score(lines_calculated)
 
