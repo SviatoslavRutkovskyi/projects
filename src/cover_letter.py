@@ -194,7 +194,14 @@ Scoring rules:
             story = []
             for para in cover_letter_text.split("\n\n"):
                 if para.strip():
-                    story.append(Paragraph(para.replace("\n", " "), normal_style))
+                    lines = para.split("\n")
+                    if len(lines) == 1:
+                        story.append(Paragraph(para.strip(), normal_style))
+                    else:
+                        # Multiple lines within one paragraph block — render each as its own paragraph
+                        for line in lines:
+                            if line.strip():
+                                story.append(Paragraph(line.strip(), normal_style))
                     story.append(Spacer(1, 12))
 
             doc.build(story)

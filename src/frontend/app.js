@@ -197,13 +197,19 @@ async function runAction(action) {
 
 // ── Cover letter PDF download ──
 async function downloadCoverLetterPdf() {
-  if (!state.coverLetterText) return;
+  const el = document.getElementById("cover-letter-text");
+  const text = el
+    ? el.tagName === "TEXTAREA"
+      ? el.value
+      : el.textContent
+    : state.coverLetterText;
+  if (!text) return;
   const btn = document.getElementById("btn-pdf");
   btn.disabled = true;
   btn.classList.add("loading");
   btn.querySelector(".btn-label").textContent = "Generating PDF...";
   try {
-    const body = { cover_letter_text: state.coverLetterText };
+    const body = { cover_letter_text: text };
     if (state.parsedJob) body.job_description = state.parsedJob;
     const response = await fetch("/api/v1/cover-letter/pdf", {
       method: "POST",
@@ -241,23 +247,56 @@ function renderCoverLetter(text) {
     "white-space:pre-wrap; font-family:var(--mono); font-size:12.5px; line-height:1.8; color:var(--text);";
   pre.textContent = text;
   out.appendChild(pre);
+  document.getElementById("btn-edit-cl").disabled = false;
+}
+
+// ── Edit cover letter toggle ──
+function toggleEditCoverLetter() {
+  const out = document.getElementById("cover-letter-output");
+  const btn = document.getElementById("btn-edit-cl");
+  const existing = out.firstChild;
+
+  if (existing && existing.tagName === "PRE") {
+    // Switch to editable textarea
+    const ta = document.createElement("textarea");
+    ta.id = "cover-letter-text";
+    ta.style.cssText =
+      "font-family:var(--mono); font-size:12.5px; line-height:1.8; min-height:400px;";
+    ta.value = existing.textContent;
+    out.innerHTML = "";
+    out.appendChild(ta);
+    btn.textContent = "Done";
+  } else if (existing && existing.tagName === "TEXTAREA") {
+    // Switch back to read-only pre
+    const text = existing.value;
+    state.coverLetterText = text;
+    const pre = document.createElement("pre");
+    pre.id = "cover-letter-text";
+    pre.style.cssText =
+      "white-space:pre-wrap; font-family:var(--mono); font-size:12.5px; line-height:1.8; color:var(--text);";
+    pre.textContent = text;
+    out.innerHTML = "";
+    out.appendChild(pre);
+    btn.textContent = "Edit";
+  }
 }
 
 // ── Render resume PDF ──
 function renderResumePdf(filename) {
   const iframe = document.getElementById("resume-iframe");
   const placeholder = document.getElementById("resume-placeholder");
-  const downloadRow = document.getElementById("resume-download-row");
   const downloadLink = document.getElementById("resume-download-link");
+  const noResumeMsg = document.getElementById("no-resume-msg");
 
   const url = "/api/v1/outputs/" + encodeURIComponent(filename);
   iframe.src = url;
   iframe.style.display = "block";
   placeholder.style.display = "none";
-  downloadRow.style.display = "flex";
   downloadLink.href = url;
   downloadLink.download = filename;
   downloadLink.textContent = "Download PDF";
+  downloadLink.style.display = "flex";
+  noResumeMsg.style.display = "none";
 
   document.getElementById("use-last-resume-row").style.display = "flex";
   document.getElementById("no-last-resume-msg").style.display = "none";
@@ -382,9 +421,8 @@ async function apiCall(method, path, body) {
 function copyText(id) {
   const el = document.getElementById(id);
   if (!el) return;
-  navigator.clipboard
-    .writeText(el.textContent)
-    .then(() => toast("Copied.", "success"));
+  const text = el.tagName === "TEXTAREA" ? el.value : el.textContent;
+  navigator.clipboard.writeText(text).then(() => toast("Copied.", "success"));
 }
 
 // ── Toast ──

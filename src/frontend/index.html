@@ -92,26 +92,23 @@
           <div class="card">
             <div class="card-header">
               <span>Cover Letter</span>
-              <button
-                class="btn btn-sm"
-                onclick="copyText('cover-letter-text')"
-              >
-                Copy
-              </button>
-            </div>
-            <div class="card-body" id="cover-letter-output">
-              <div class="empty-state">
-                Generate a cover letter to see it here.
-              </div>
-            </div>
-          </div>
-
-          <div class="cover-letter-actions">
-            <div class="card">
-              <div class="card-header">PDF</div>
-              <div class="card-body">
+              <div class="flex gap-2">
                 <button
-                  class="btn w-full"
+                  class="btn btn-sm"
+                  onclick="copyText('cover-letter-text')"
+                >
+                  Copy
+                </button>
+                <button
+                  class="btn btn-sm"
+                  id="btn-edit-cl"
+                  onclick="toggleEditCoverLetter()"
+                  disabled
+                >
+                  Edit
+                </button>
+                <button
+                  class="btn btn-sm"
                   id="btn-pdf"
                   onclick="downloadCoverLetterPdf()"
                   disabled
@@ -121,7 +118,14 @@
                 </button>
               </div>
             </div>
+            <div class="card-body" id="cover-letter-output">
+              <div class="empty-state">
+                Generate a cover letter to see it here.
+              </div>
+            </div>
           </div>
+
+          <div class="cover-letter-actions"></div>
         </div>
       </div>
 
@@ -139,21 +143,26 @@
                 style="display: none"
               ></iframe>
             </div>
-            <div
-              class="mt-2 flex gap-2"
-              id="resume-download-row"
-              style="display: none"
-            >
-              <a
-                id="resume-download-link"
-                class="btn btn-sm"
-                style="text-decoration: none"
-                >Download PDF</a
-              >
-            </div>
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 12px">
+            <div class="card">
+              <div class="card-header">Download</div>
+              <div class="card-body">
+                <a
+                  id="resume-download-link"
+                  class="btn w-full"
+                  style="
+                    text-decoration: none;
+                    justify-content: center;
+                    display: none;
+                  "
+                >
+                  Download PDF
+                </a>
+                <span class="meta-text" id="no-resume-msg">No resume yet.</span>
+              </div>
+            </div>
             <div class="card">
               <div class="card-header">Feedback</div>
               <div class="card-body">
