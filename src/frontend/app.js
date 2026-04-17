@@ -3,7 +3,6 @@ let state = {
   jobPosting: "",
   parsedJob: null,
   coverLetterText: null,
-  coverLetterPdfFilename: null,
   resumePdfFilename: null,
   lastResumeJson: null,
 };
@@ -137,9 +136,6 @@ async function runAction(action) {
       state.parsedJob = result.job_description;
       renderCoverLetter(result.cover_letter);
       document.getElementById("btn-pdf").disabled = false;
-      state.coverLetterPdfFilename = null;
-      document.getElementById("pdf-download-cl").style.display = "none";
-      switchTab("cover-letter");
       toast("Cover letter generated.", "success");
     } else if (action === "resume") {
       setActionLoading(action, "Tailoring...");
@@ -155,10 +151,8 @@ async function runAction(action) {
       state.lastResumeJson = result.last_resume_json;
       state.resumePdfFilename = result.pdf_filename;
       renderResumePdf(result.pdf_filename);
-      switchTab("resume");
       toast("Resume tailored.", "success");
     } else if (action === "answer") {
-      switchTab("questions");
       const pairs = document.querySelectorAll(".qa-pair");
       if (pairs.length === 0) {
         addQuestion();
@@ -168,26 +162,28 @@ async function runAction(action) {
         return;
       }
       setActionLoading(action, "Answering...");
-      for (const pair of pairs) {
-        const input = pair.querySelector("textarea");
-        const answerBox = pair.querySelector(".answer-box");
-        if (!input.value.trim() || answerBox.dataset.answered === "true")
-          continue;
-        answerBox.textContent = "Answering...";
-        answerBox.classList.add("empty");
-        try {
-          const res = await apiCall("POST", "/api/v1/questions/answer", {
-            job_description: jobDesc,
-            question: input.value.trim(),
-          });
-          answerBox.textContent = res.answer;
-          answerBox.classList.remove("empty");
-          answerBox.dataset.answered = "true";
-          state.parsedJob = res.job_description;
-        } catch (e) {
-          answerBox.textContent = "Error: " + e.message;
-        }
-      }
+      await Promise.all(
+        Array.from(pairs).map(async (pair) => {
+          const input = pair.querySelector("textarea");
+          const answerBox = pair.querySelector(".answer-box");
+          if (!input.value.trim() || answerBox.dataset.answered === "true")
+            return;
+          answerBox.textContent = "Answering...";
+          answerBox.classList.add("empty");
+          try {
+            const res = await apiCall("POST", "/api/v1/questions/answer", {
+              job_description: jobDesc,
+              question: input.value.trim(),
+            });
+            answerBox.textContent = res.answer;
+            answerBox.classList.remove("empty");
+            answerBox.dataset.answered = "true";
+            state.parsedJob = res.job_description;
+          } catch (e) {
+            answerBox.textContent = "Error: " + e.message;
+          }
+        }),
+      );
       toast("Questions answered.", "success");
     }
   } catch (err) {
@@ -199,13 +195,13 @@ async function runAction(action) {
   }
 }
 
-// ── Cover letter PDF ──
-async function convertToPdf() {
+// ── Cover letter PDF download ──
+async function downloadCoverLetterPdf() {
   if (!state.coverLetterText) return;
   const btn = document.getElementById("btn-pdf");
   btn.disabled = true;
   btn.classList.add("loading");
-  btn.querySelector(".btn-label").textContent = "Converting...";
+  btn.querySelector(".btn-label").textContent = "Generating PDF...";
   try {
     const body = { cover_letter_text: state.coverLetterText };
     if (state.parsedJob) body.job_description = state.parsedJob;
@@ -217,18 +213,21 @@ async function convertToPdf() {
     if (!response.ok) throw new Error(await response.text());
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
-    const link = document.getElementById("pdf-link-cl");
-    link.href = url;
-    link.download = "cover_letter.pdf";
-    link.textContent = "Download PDF";
-    document.getElementById("pdf-download-cl").style.display = "block";
-    toast("PDF ready.", "success");
+    const a = document.createElement("a");
+    const company = state.parsedJob?.company_name;
+    a.download = company
+      ? `cover_letter_${company.toLowerCase().replace(/\s+/g, "_")}.pdf`
+      : "cover_letter.pdf";
+    a.href = url;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast("PDF downloaded.", "success");
   } catch (e) {
     toast("PDF generation failed: " + e.message, "error");
   } finally {
     btn.disabled = false;
     btn.classList.remove("loading");
-    btn.querySelector(".btn-label").textContent = "Convert to PDF";
+    btn.querySelector(".btn-label").textContent = "Download PDF";
   }
 }
 
