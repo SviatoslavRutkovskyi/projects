@@ -1,0 +1,7 @@
+.env
+.venv
+__pycache__
+.cursor
+*.pyc
+static/output
+.git
