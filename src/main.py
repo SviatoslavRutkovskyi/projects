@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 class Main:
     def __init__(
         self,
-        creator_model="gpt-4o",
-        evaluator_model="o4-mini",
-        eval_limit=10,
+        creator_model: str = "gpt-4o",
+        evaluator_model: str = "o4-mini",
+        eval_limit: int = 10,
         config_file: str = "resources/app_config.json",
-        include_feedback=False,
+        include_feedback: bool = False,
     ):
         self.config = validate_app_config(config_file)
         self.empty_file_path = str(self.config.empty_pdf)
@@ -32,6 +32,7 @@ class Main:
         self.resume_builder = Resume(config=self.config, creator_model=creator_model)
         self.cover_letter_builder = CoverLetter(
             config=self.config,
+            creator_model=creator_model,q
             evaluator_model=evaluator_model,
             eval_limit=eval_limit,
             include_feedback=include_feedback,

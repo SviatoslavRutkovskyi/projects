@@ -15,10 +15,10 @@ class CoverLetter:
     def __init__(
         self,
         config: AppConfig,
-        creator_model="gpt-5-mini",
-        evaluator_model="o4-mini",
-        eval_limit=10,
-        include_feedback=False,
+        creator_model: str,
+        evaluator_model: str,
+        eval_limit: int,
+        include_feedback: bool,
     ):
 
         self.config = config
