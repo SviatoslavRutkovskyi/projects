@@ -45,7 +45,7 @@ class ApplicationServices:
         evaluator_model: str = "o4-mini",
         eval_limit: int = 10,
         fit_limit: int = 5,
-        config_file: str = "resources/app_config.json",
+        config_file: str = os.getenv("APP_CONFIG", "resources/app_config.json"),
         include_feedback: bool = False,
     ):
         self.config = validate_app_config(config_file)
