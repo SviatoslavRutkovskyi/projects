@@ -4,6 +4,5 @@
   "resume_template_tex": "resources/resume_template.tex",
   "resume_layout_json": "resources/resume_layout.json",
   "line_estimates_json": "resources/line_estimates.json",
-  "empty_pdf": "resources/empty.pdf",
   "personal_summary": "me/personal_summary.json"
 }

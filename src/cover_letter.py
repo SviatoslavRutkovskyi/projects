@@ -26,12 +26,6 @@ class CoverLetter:
         self.evaluator_model = evaluator_model
         self.eval_limit = eval_limit
         self.include_feedback = include_feedback
-        
-        # Use empty.pdf for consistent file component sizing
-        self.empty_file_path = str(self.config.empty_pdf)
-        
-        # Store last job info for PDF filename
-        self.last_job_info = None
     
         # AI models 
         self.openai = OpenAI()
@@ -132,7 +126,6 @@ Scoring rules:
     def request_letter(self, job_info: JobDescription):
         logger.info("Requesting cover letter")
         logger.info(f"Job: {job_info.job_title or 'N/A'} at {job_info.company_name or 'N/A'}")
-        self.last_job_info = job_info
 
         job_message = "## Job Posting\n" + job_info.model_dump_json(indent=2)
         cover_letter = self.run(
@@ -176,13 +169,12 @@ Scoring rules:
                 + "\n\n## Feedback\n" + evaluation.feedback
             )
 
-    def convert_cover_letter_to_pdf(self, cover_letter_text):
+    def convert_cover_letter_to_pdf(self, cover_letter_text: str, *, company_name: str | None = None):
         """Convert cover letter text to PDF."""
         if not cover_letter_text or not cover_letter_text.strip():
             logger.warning("No cover letter text provided for PDF conversion")
             return None
 
-        company_name = self.last_job_info.company_name if self.last_job_info else None
         company_name_sanitized = sanitize_filename(company_name) if company_name else ""
         filename_base = f"cover_letter_{company_name_sanitized}" if company_name_sanitized else "cover_letter"
 
