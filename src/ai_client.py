@@ -32,7 +32,7 @@ class AIClient:
             self.client = AzureOpenAI(
                 azure_endpoint=azure_endpoint,
                 azure_ad_token_provider=token_provider,
-                api_version="2024-10-21",
+                api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2025-04-01-preview"),
             )
         else:
             self.client = OpenAI()
