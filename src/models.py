@@ -115,6 +115,12 @@ class ResumeLayoutConfig(BaseModel):
     section_order: list[ResumeSectionId]
 
 
+# --- Text generation output ---
+
+class TextResponse(BaseModel):
+    text: str
+
+
 # Cover letter-related models
 class Evaluation(BaseModel):
     is_acceptable: bool

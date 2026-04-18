@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from ai_client import AIClient
 from cover_letter import CoverLetter
 from job_processor import JobProcessor
 from models import (
@@ -24,6 +25,7 @@ from models import (
 from question_answerer import QuestionAnswerer
 from resume import Resume
 from utils import validate_app_config
+
 
 load_dotenv(override=True)
 
@@ -42,28 +44,23 @@ class ApplicationServices:
 
     def __init__(
         self,
-        creator_model: str = "gpt-4o",
-        evaluator_model: str = "o4-mini",
         eval_limit: int = 10,
         fit_limit: int = 5,
         config_file: str = os.getenv("APP_CONFIG", "resources/app_config.json"),
         include_feedback: bool = False,
     ):
         self.config = validate_app_config(config_file)
+        ai = AIClient()
 
-        self.resume_builder = Resume(config=self.config, creator_model=creator_model, fit_limit=fit_limit)
+        self.resume_builder = Resume(config=self.config, ai=ai, fit_limit=fit_limit)
         self.cover_letter_builder = CoverLetter(
             config=self.config,
-            creator_model=creator_model,
-            evaluator_model=evaluator_model,
+            ai=ai,
             eval_limit=eval_limit,
             include_feedback=include_feedback,
         )
-        self.question_answerer = QuestionAnswerer(
-            config=self.config,
-            creator_model=creator_model,
-        )
-        self.job_processor = JobProcessor(model=creator_model)
+        self.question_answerer = QuestionAnswerer(config=self.config, ai=ai)
+        self.job_processor = JobProcessor(ai=ai)
 
     def get_or_parse_job(
         self, job_posting: str | None, job_desc: JobDescription | None

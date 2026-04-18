@@ -3,7 +3,7 @@ import json
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
-from openai import OpenAI
+from ai_client import AIClient
 from models import JobDescription
 
 logger = logging.getLogger(__name__)
@@ -12,41 +12,19 @@ logger = logging.getLogger(__name__)
 class JobProcessor:
     """Processes job descriptions and extracts structured information."""
 
-    def __init__(self, model: str = "gpt-4o", temperature: float = 0.3):
-        self.model = model
-        self.temperature = temperature
-        self.openai = OpenAI()
+    def __init__(self, ai: AIClient):
+        self.ai = ai
 
     def extract_job_info(self, job_description_text: str) -> JobDescription:
-        """Extract structured information from a job description."""
         json_schema = json.dumps(JobDescription.model_json_schema(), indent=2)
-
         system_prompt = f"""Extract the following JSON fields from the job text.
 
 Return ONLY valid JSON with missing fields as null or [].
 
 {json_schema}"""
-
-        response = self.openai.responses.parse(
-            model=self.model,
-            input=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Job text:\n\n{job_description_text}"},
-            ],
-            text_format=JobDescription,
-            temperature=self.temperature,
-        )
-        return response.output_parsed
+        return self.ai.run(system_prompt, f"Job text:\n\n{job_description_text}", JobDescription)
 
     def is_usable(self, job_info: JobDescription) -> bool:
-        """
-        Check if JobDescription contains enough information for generation.
-        Returns True if at least 2 of the following are present:
-        - job_title
-        - 2+ required_skills
-        - 2+ responsibilities
-        - description_summary of 40+ chars
-        """
         conditions_met = sum([
             job_info.job_title is not None,
             len(job_info.required_skills) >= 2,
@@ -56,7 +34,6 @@ Return ONLY valid JSON with missing fields as null or [].
         return conditions_met >= 2
 
     def is_url(self, text: str) -> bool:
-        """Check if the input text is a valid URL."""
         try:
             result = urlparse(text.strip())
             return all([result.scheme, result.netloc])
@@ -64,7 +41,6 @@ Return ONLY valid JSON with missing fields as null or [].
             return False
 
     def scrape_webpage_simple(self, url: str) -> str | None:
-        """Scrape text content from a webpage URL."""
         try:
             logger.info(f"Scraping {url}")
             headers = {
@@ -83,7 +59,6 @@ Return ONLY valid JSON with missing fields as null or [].
             return None
 
     def process_job_posting(self, job_posting: str) -> str:
-        """Scrape if URL, return as-is if plain text."""
         if self.is_url(job_posting):
             logger.info(f"Detected URL: {job_posting}")
             scraped = self.scrape_webpage_simple(job_posting.strip())
@@ -97,13 +72,6 @@ Return ONLY valid JSON with missing fields as null or [].
         return job_posting
 
     def process_and_extract_job_info(self, job_posting: str) -> JobDescription:
-        """
-        Process job posting (scrape if URL) and extract structured information.
-
-        Raises:
-            ValueError: If the extracted job description does not contain enough information.
-            Exception: If URL scraping fails.
-        """
         raw_job_text = self.process_job_posting(job_posting)
 
         logger.info("Extracting job info from text")
