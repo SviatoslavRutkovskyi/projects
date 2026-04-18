@@ -1,34 +1,27 @@
-from openai import OpenAI
 import logging
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
-from models import AppConfig, Evaluation, JobDescription
+from ai_client import AIClient
+from models import AppConfig, Evaluation, JobDescription, TextResponse
 from utils import sanitize_filename, load_candidate_data, save_output_file
 
 logger = logging.getLogger(__name__)
-
 
 
 class CoverLetter:
     def __init__(
         self,
         config: AppConfig,
-        creator_model: str,
-        evaluator_model: str,
+        ai: AIClient,
         eval_limit: int,
         include_feedback: bool,
     ):
-
         self.config = config
-        self.creator_model = creator_model
-        self.evaluator_model = evaluator_model
+        self.ai = ai
         self.eval_limit = eval_limit
         self.include_feedback = include_feedback
-    
-        # AI models 
-        self.openai = OpenAI()
 
         with open(self.config.cover_letter_template, encoding="utf-8") as f:
             self.cover_letter_template = f.read()
@@ -51,7 +44,6 @@ If given a rejected cover letter and feedback, treat each criticism as a specifi
 ## Candidate Data:
 {candidate_json}
 """
-
 
         self.evaluator_system_prompt = f"""
 You are a professional hiring manager evaluating a cover letter for submission.
@@ -78,7 +70,6 @@ Before scoring, verify every outcome or result claim in the letter against the c
 3. If the claim cannot be traced directly to the candidate data, it is fabrication — quote what the candidate data actually says about that project and include it in your feedback so the generator can use accurate information instead
 Mark acceptable: false if any fabrication is found.
 
-
 Scoring rules:
 - If the letter has clear fixable weaknesses, provide direct feedback of 2-4 sentences ordered by impact and mark acceptable: false
 - Otherwise mark acceptable: true
@@ -90,48 +81,29 @@ Scoring rules:
 {candidate_json}
 """
 
-
     def evaluator_cover_letter(self, job_info: JobDescription, cover_letter):
         formatted_job_info = job_info.model_dump_json(indent=2)
         return f"Job Description:\n{formatted_job_info}\n\nCover Letter:\n{cover_letter}"
 
-
     def evaluate(self, job_info: JobDescription, cover_letter) -> Evaluation:
-        messages = [
-            {"role": "system", "content": self.evaluator_system_prompt},
-            {"role": "user", "content": self.evaluator_cover_letter(job_info, cover_letter)},
-        ]
-        response = self.openai.responses.parse(
-            model=self.evaluator_model,
-            reasoning = {"effort":"medium"},
-            input=messages,
-            text_format = Evaluation,
-            )
-        return response.output_parsed
-
-
-    def run(self, user_message: str) -> str:
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": user_message},
-        ]
-        response = self.openai.responses.create(
-            model=self.creator_model,
-            input=messages,
+        return self.ai.run(
+            self.evaluator_system_prompt,
+            self.evaluator_cover_letter(job_info, cover_letter),
+            Evaluation,
         )
-        return response.output_text
-
 
     def request_letter(self, job_info: JobDescription):
         logger.info("Requesting cover letter")
         logger.info(f"Job: {job_info.job_title or 'N/A'} at {job_info.company_name or 'N/A'}")
 
         job_message = "## Job Posting\n" + job_info.model_dump_json(indent=2)
-        cover_letter = self.run(
+        cover_letter = self.ai.run(
+            self.system_prompt,
             job_message
             + "\n\n## Cover Letter Template (Use as starting point. Replace all bracketed placeholders with actual content from the candidate data and job description)\n"
-            + self.cover_letter_template
-        )
+            + self.cover_letter_template,
+            TextResponse,
+        ).text
 
         max_score = -1
         best_cover_letter = cover_letter
@@ -162,14 +134,17 @@ Scoring rules:
 
             eval_counter += 1
 
-            cover_letter = self.run(
+            cover_letter = self.ai.run(
+                self.system_prompt,
                 job_message
                 + "\n\n## Previous Attempt (rejected)\n" + cover_letter
-                + "\n\n## Feedback\n" + evaluation.feedback
-            )
+                + "\n\n## Feedback\n" + evaluation.feedback,
+                TextResponse,
+            ).text
+
+        return best_cover_letter
 
     def convert_cover_letter_to_pdf(self, cover_letter_text: str, *, company_name: str | None = None):
-        """Convert cover letter text to PDF."""
         if not cover_letter_text or not cover_letter_text.strip():
             logger.warning("No cover letter text provided for PDF conversion")
             return None
@@ -198,7 +173,6 @@ Scoring rules:
                     if len(lines) == 1:
                         story.append(Paragraph(para.strip(), normal_style))
                     else:
-                        # Multiple lines within one paragraph block — render each as its own paragraph
                         for line in lines:
                             if line.strip():
                                 story.append(Paragraph(line.strip(), normal_style))

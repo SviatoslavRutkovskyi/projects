@@ -1,4 +1,3 @@
-from openai import OpenAI
 import json
 import subprocess
 import time
@@ -7,6 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 import math
 
+from ai_client import AIClient
 from latex_generator import LatexGenerator
 from models import AppConfig, ResumeData, JobDescription
 from utils import sanitize_filename, load_candidate_data, save_output_file
@@ -20,11 +20,11 @@ class Resume:
     def __init__(
         self,
         config: AppConfig,
-        creator_model: str,
+        ai: AIClient,
         fit_limit: int,
     ):
         self.config = config
-        self.creator_model = creator_model
+        self.ai = ai
         self.latex_generator = LatexGenerator(config=self.config)
         self.fit_limit = fit_limit
 
@@ -36,18 +36,9 @@ class Resume:
             raise ValueError(f"Invalid line estimates JSON at {line_path}: {e}") from e
 
         self.candidate_data = load_candidate_data(self.config.candidate_json)
-
         self.system_prompt = self._build_system_prompt()
 
-        self.openai = OpenAI()
-
     def _fit_score(self, lines: float) -> tuple:
-        """
-        Returns a tuple score where lower is better.
-        (0, 0)       = in range (best)
-        (1, gap)     = under min (acceptable, larger gap is worse)
-        (2, gap)     = over max (worst, larger gap is worse)
-        """
         min_l = self._line_estimates['min_page_lines']
         max_l = self._line_estimates['max_page_lines']
 
@@ -58,10 +49,6 @@ class Resume:
         return (0, 0)
 
     def tailor_resume(self, job_info: JobDescription, resume_feedback, last_resume_content=None):
-        """
-        Tailor resume to job posting using structured job information.
-        Returns (pdf_path, resume_json) on success, or None on failure.
-        """
         start_time = time.time()
         run_id = uuid4()
         logger.info(f"[tailor_resume called] run_id={run_id}")
@@ -70,11 +57,10 @@ class Resume:
         if last_resume_content:
             logger.info("    Using last resume as base for tailoring")
 
-        # First attempt — full context including feedback and last resume
         user_message = self._build_user_message(job_info, resume_feedback, last_resume_content)
         elapsed = time.time() - start_time
         logger.info(f"[2/5] Generating tailored resume content... ({elapsed:.1f}s elapsed)")
-        resume_data = self.run(self.system_prompt, user_message)
+        resume_data = self.ai.run(self.system_prompt, user_message, ResumeData)
 
         elapsed = time.time() - start_time
         logger.info(f"[3/5] Verifying resume length... ({elapsed:.1f}s elapsed)")
@@ -102,13 +88,12 @@ class Resume:
             elapsed = time.time() - start_time
             logger.info(f"[3/5] Adjusting resume length... ({elapsed:.1f}s elapsed)")
 
-            # Retries — size correction only, no feedback re-sent
-            resume_data = self.run(
+            resume_data = self.ai.run(
                 self.system_prompt,
-                self._build_retry_message(job_info, resume_data.model_dump_json(), lines_calculated)
+                self._build_retry_message(job_info, resume_data.model_dump_json(), lines_calculated),
+                ResumeData,
             )
 
-        # Use best result found across all attempts
         resume_data = best_resume_data
         final_lines = self.calculate_resume_lines(resume_data, self._line_estimates)
 
@@ -152,18 +137,6 @@ class Resume:
         logger.info(f"Resume generated successfully: {pdf_path} ({elapsed:.1f}s elapsed)")
         return str(pdf_path), resume_data.model_dump_json()
 
-    def run(self, prompt, user_message) -> ResumeData:
-        """Run API call."""
-        response = self.openai.responses.parse(
-            model=self.creator_model,
-            input=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": user_message},
-            ],
-            text_format=ResumeData,
-        )
-        return response.output_parsed
-
     def calculate_resume_lines(self, resume_data: ResumeData, estimates: dict) -> float:
         H = estimates["section_heading_line"]
 
@@ -197,7 +170,6 @@ class Resume:
         return total
 
     def _build_system_prompt(self):
-        """Build system prompt with candidate JSON and line-budget file."""
         candidate_json = self.candidate_data.model_dump_json(indent=2)
 
         return f"""You are a resume editor. The job posting is in the user message.
@@ -221,7 +193,6 @@ If you receive feedback stating your total number of lines, treat it as truth an
 {self._line_estimates_prompt_text}"""
 
     def _build_user_message(self, job_info: JobDescription, resume_feedback, last_resume_content=None):
-        """Build first-attempt message with full context: job posting, last resume, and feedback."""
         parts = [f"## Job posting\n{job_info.model_dump_json(indent=2)}"]
 
         if last_resume_content:
@@ -236,8 +207,6 @@ If you receive feedback stating your total number of lines, treat it as truth an
         return "\n\n".join(parts)
 
     def _build_retry_message(self, job_info: JobDescription, previous_output: str, lines_calculated: float) -> str:
-        """Build retry message for size correction only. No feedback or last resume — those are
-        already reflected in the previous output and should not be reinterpreted."""
         min_l = self._line_estimates['min_page_lines']
         max_l = self._line_estimates['max_page_lines']
         if lines_calculated > max_l:
