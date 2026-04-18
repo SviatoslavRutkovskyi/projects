@@ -10,7 +10,6 @@ class AIClient:
 
     Azure env vars:
         AZURE_OPENAI_ENDPOINT: e.g. https://your-resource.openai.azure.com
-        AZURE_OPENAI_API_KEY: your Azure OpenAI key
         AZURE_OPENAI_MODEL: deployment name, e.g. gpt-5.4-mini
 
     OpenAI env vars:
