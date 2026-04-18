@@ -24,13 +24,15 @@ class AIClient:
         azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
 
         if azure_endpoint:
+            from openai import AzureOpenAI
             from azure.identity import DefaultAzureCredential, get_bearer_token_provider
             token_provider = get_bearer_token_provider(
-                DefaultAzureCredential(), "https://ai.azure.com/.default"
+                DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
             )
-            self.client = OpenAI(
-                api_key=token_provider,
-                base_url=azure_endpoint.rstrip("/") + "/openai/v1/",
+            self.client = AzureOpenAI(
+                azure_endpoint=azure_endpoint,
+                azure_ad_token_provider=token_provider,
+                api_version="2024-10-21",
             )
         else:
             self.client = OpenAI()
