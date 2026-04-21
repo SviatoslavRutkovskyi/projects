@@ -150,7 +150,7 @@ Scoring rules:
             return None
 
         company_name_sanitized = sanitize_filename(company_name) if company_name else ""
-        filename = f"cover_letter_{company_name_sanitized}.pdf" if company_name_sanitized else "cover_letter.pdf"
+        filename_base = f"cover_letter_{company_name_sanitized}" if company_name_sanitized else "cover_letter"
 
         try:
             buffer = BytesIO()
@@ -179,8 +179,9 @@ Scoring rules:
                     story.append(Spacer(1, 12))
 
             doc.build(story)
-            logger.info(f"Cover letter PDF generated: {filename}")
-            return buffer.getvalue(), filename
+            pdf_path = save_output_file(f"{filename_base}.pdf", buffer.getvalue(), prefix="cover_letter")
+            logger.info(f"Cover letter PDF created: {pdf_path}")
+            return str(pdf_path)
 
         except Exception as e:
             logger.error(f"Error creating cover letter PDF: {e}")

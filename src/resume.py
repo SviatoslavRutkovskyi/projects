@@ -60,7 +60,7 @@ class Resume:
         user_message = self._build_user_message(job_info, resume_feedback, last_resume_content)
         elapsed = time.time() - start_time
         logger.info(f"[2/5] Generating tailored resume content... ({elapsed:.1f}s elapsed)")
-        resume_data = self.ai.run(self.system_prompt, user_message, ResumeData)
+        resume_data = self.ai.run(self.system_prompt, user_message, ResumeData, reasoning=True)
 
         elapsed = time.time() - start_time
         logger.info(f"[3/5] Verifying resume length... ({elapsed:.1f}s elapsed)")
@@ -92,6 +92,7 @@ class Resume:
                 self.system_prompt,
                 self._build_retry_message(job_info, resume_data.model_dump_json(), lines_calculated),
                 ResumeData,
+                reasoning=True,
             )
 
         resume_data = best_resume_data

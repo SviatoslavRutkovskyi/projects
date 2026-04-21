@@ -26,10 +26,11 @@ class AIClient:
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2025-04-01-preview"),
         )
         self.model = os.getenv("AZURE_OPENAI_MODEL", "gpt-5.4-mini")
+        self.reasoning = os.getenv("AZURE_OPENAI_REASONING_MODEL", "o4-mini")
 
-    def run(self, system_prompt: str, user_message: str, schema):
+    def run(self, system_prompt: str, user_message: str, schema, reasoning=False):
         response = self.client.responses.parse(
-            model=self.model,
+            model=self.reasoning if reasoning else self.model,
             input=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
