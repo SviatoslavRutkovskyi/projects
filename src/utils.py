@@ -12,8 +12,6 @@ def save_output_file(filename: str, data: bytes, prefix: str) -> Path:
     """
     Save a file to output storage, first removing any existing files with the same prefix.
     Returns the path of the saved file.
-
-    Swap this implementation for Blob Storage when moving to Azure.
     """
     output_dir = Path("static/output")
     output_dir.mkdir(parents=True, exist_ok=True)
