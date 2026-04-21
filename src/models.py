@@ -183,7 +183,6 @@ class JobContextBody(BaseModel):
 
 class CoverLetterResponse(BaseModel):
     cover_letter: str
-    job_description: JobDescription
 
 
 class CoverLetterPdfBody(BaseModel):
@@ -200,9 +199,8 @@ class TailorResumeBody(JobContextBody):
 
 
 class TailorResumeResponse(BaseModel):
-    job_description: JobDescription
     last_resume_json: str
-    pdf_filename: str
+    pdf_blob_name: str
 
 
 class AnswerQuestionBody(JobContextBody):

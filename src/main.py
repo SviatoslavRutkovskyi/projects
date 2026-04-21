@@ -5,7 +5,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from ai_client import AIClient
@@ -104,18 +104,6 @@ def get_services(request: Request) -> ApplicationServices:
     return request.app.state.services
 
 
-def _safe_output_path(filename: str) -> Path:
-    if "/" in filename or "\\" in filename or filename in (".", ".."):
-        raise HTTPException(status_code=400, detail="Invalid filename.")
-    base = OUTPUT_DIR.resolve()
-    candidate = (base / filename).resolve()
-    if not candidate.is_relative_to(base):
-        raise HTTPException(status_code=400, detail="Invalid filename.")
-    if not candidate.is_file():
-        raise HTTPException(status_code=404, detail="File not found.")
-    return candidate
-
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -137,23 +125,28 @@ def generate_cover_letter(body: JobContextBody, request: Request):
     services = get_services(request)
     job_desc = services.get_or_parse_job(body.job_posting, body.job_description)
     cover_letter = services.cover_letter_builder.request_letter(job_desc)
-    return CoverLetterResponse(cover_letter=cover_letter, job_description=job_desc)
+    return CoverLetterResponse(cover_letter=cover_letter)
 
 
 @app.post("/api/v1/cover-letter/pdf")
 def cover_letter_pdf(body: CoverLetterPdfBody, request: Request):
     services = get_services(request)
     company_name = body.job_description.company_name if body.job_description else None
-    path = services.cover_letter_builder.convert_cover_letter_to_pdf(
+    result = services.cover_letter_builder.convert_cover_letter_to_pdf(
         body.cover_letter_text,
         company_name=company_name,
     )
-    if path is None:
+    if result is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not generate cover letter PDF.",
         )
-    return FileResponse(path, media_type="application/pdf", filename=Path(path).name)
+    pdf_bytes, filename = result
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @app.post("/api/v1/resume/tailor", response_model=TailorResumeResponse)
@@ -166,22 +159,38 @@ def tailor_resume(body: TailorResumeBody, request: Request):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Resume tailoring or PDF compilation failed.",
         )
-    pdf_path, resume_json = result
+    blob_name, resume_json = result
     return TailorResumeResponse(
-        job_description=job_desc,
         last_resume_json=resume_json,
-        pdf_filename=Path(pdf_path).name,
+        pdf_blob_name=blob_name,
     )
 
 
-@app.get("/api/v1/outputs/{filename}")
-def download_output(filename: str):
-    path = _safe_output_path(filename)
-    return FileResponse(
-        path,
-        media_type="application/pdf",
-        headers={"Content-Disposition": "inline"},
-    )
+@app.get("/api/v1/resume/download/{blob_name:path}")
+def download_resume(blob_name: str):
+    """Proxy download — fetches PDF from Blob Storage and streams to client."""
+    from azure.identity import DefaultAzureCredential
+    from azure.storage.blob import BlobServiceClient
+    import os
+
+    account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+    credential = DefaultAzureCredential()
+    account_url = f"https://{account_name}.blob.core.windows.net"
+    blob_service_client = BlobServiceClient(account_url=account_url, credential=credential)
+    blob_client = blob_service_client.get_blob_client(container="outputs", blob=blob_name)
+
+    try:
+        stream = blob_client.download_blob()
+        pdf_bytes = stream.readall()
+        filename = blob_name[37:] if len(blob_name) > 37 else "resume.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"inline; filename={filename}"},
+        )
+    except Exception as e:
+        logger.error(f"Failed to download blob {blob_name}: {e}")
+        raise HTTPException(status_code=404, detail="Resume not found.")
 
 
 @app.post("/api/v1/questions/answer", response_model=AnswerQuestionResponse)
@@ -200,6 +209,7 @@ def answer_question(body: AnswerQuestionBody, request: Request):
 if __name__ == "__main__":
     import uvicorn
 
+    logger.info("Local server starting at http://localhost:7860")
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

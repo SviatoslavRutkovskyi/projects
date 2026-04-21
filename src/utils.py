@@ -1,27 +1,39 @@
 import json
 import logging
+import os
 import re
 from pathlib import Path
+from uuid import uuid4
+
+from azure.identity import DefaultAzureCredential
+from azure.storage.blob import BlobServiceClient, ContentSettings
 
 from models import AppConfig, CandidateProfile
 
 logger = logging.getLogger(__name__)
 
 
-def save_output_file(filename: str, data: bytes, prefix: str) -> Path:
+def save_output_file(filename: str, data: bytes, prefix: str) -> str:
     """
-    Save a file to output storage, first removing any existing files with the same prefix.
-    Returns the path of the saved file.
+    Save a file to Azure Blob Storage and return the blob name.
+    Requires AZURE_STORAGE_ACCOUNT_NAME to be set.
+    """
+    account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+    container_name = "outputs"
+    blob_name = f"{uuid4()}-{filename}"
 
-    Swap this implementation for Blob Storage when moving to Azure.
-    """
-    output_dir = Path("static/output")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    for old_file in output_dir.glob(f"{prefix}*"):
-        old_file.unlink()
-    path = output_dir / filename
-    path.write_bytes(data)
-    return path
+    credential = DefaultAzureCredential()
+    account_url = f"https://{account_name}.blob.core.windows.net"
+    blob_service_client = BlobServiceClient(account_url=account_url, credential=credential)
+
+    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+    blob_client.upload_blob(
+        data,
+        overwrite=True,
+        content_settings=ContentSettings(content_type="application/pdf"),
+    )
+
+    return blob_name
 
 
 def load_app_config(config_file: str) -> AppConfig:

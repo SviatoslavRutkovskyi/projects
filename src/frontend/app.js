@@ -133,7 +133,6 @@ async function runAction(action) {
         job_description: jobDesc,
       });
       state.coverLetterText = result.cover_letter;
-      state.parsedJob = result.job_description;
       renderCoverLetter(result.cover_letter);
       document.getElementById("btn-pdf").disabled = false;
       toast("Cover letter generated.", "success");
@@ -149,8 +148,8 @@ async function runAction(action) {
       const result = await apiCall("POST", "/api/v1/resume/tailor", body);
       state.parsedJob = result.job_description;
       state.lastResumeJson = result.last_resume_json;
-      state.resumePdfFilename = result.pdf_filename;
-      renderResumePdf(result.pdf_filename);
+      state.resumePdfUrl = "/api/v1/resume/download/" + result.pdf_blob_name;
+      renderResumePdf("/api/v1/resume/download/" + result.pdf_blob_name);
       toast("Resume tailored.", "success");
     } else if (action === "answer") {
       const pairs = document.querySelectorAll(".qa-pair");
@@ -282,20 +281,20 @@ function toggleEditCoverLetter() {
 }
 
 // ── Render resume PDF ──
-function renderResumePdf(filename) {
+function renderResumePdf(url) {
   const iframe = document.getElementById("resume-iframe");
   const placeholder = document.getElementById("resume-placeholder");
   const downloadLink = document.getElementById("resume-download-link");
   const noResumeMsg = document.getElementById("no-resume-msg");
 
-  const url = "/api/v1/outputs/" + encodeURIComponent(filename);
   iframe.src = url;
   iframe.style.display = "block";
   placeholder.style.display = "none";
   downloadLink.href = url;
-  downloadLink.download = filename;
+  downloadLink.download = "resume.pdf";
   downloadLink.textContent = "Download PDF";
   downloadLink.style.display = "flex";
+  downloadLink.onclick = null;
   noResumeMsg.style.display = "none";
 
   document.getElementById("use-last-resume-row").style.display = "flex";

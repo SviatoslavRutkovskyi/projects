@@ -116,7 +116,11 @@ class Resume:
             logger.error("Failed to create LaTeX from resume data")
             return None
 
-        tex_path = save_output_file(f"{filename_base}.tex", latex_content.encode("utf-8"), prefix="resume")
+        # Save .tex locally for Tectonic compilation
+        output_dir = Path("static/output")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        tex_path = output_dir / f"{filename_base}.tex"
+        tex_path.write_bytes(latex_content.encode("utf-8"))
         pdf_path = tex_path.with_suffix(".pdf")
 
         elapsed = time.time() - start_time
@@ -133,9 +137,12 @@ class Resume:
             logger.error(f"LaTeX error details: {result.stderr}")
             return None
 
+        # Upload PDF to Blob Storage
+        blob_name = save_output_file(f"{filename_base}.pdf", pdf_path.read_bytes(), prefix="resume")
+
         elapsed = time.time() - start_time
-        logger.info(f"Resume generated successfully: {pdf_path} ({elapsed:.1f}s elapsed)")
-        return str(pdf_path), resume_data.model_dump_json()
+        logger.info(f"Resume generated successfully: {blob_name} ({elapsed:.1f}s elapsed)")
+        return blob_name, resume_data.model_dump_json()
 
     def calculate_resume_lines(self, resume_data: ResumeData, estimates: dict) -> float:
         H = estimates["section_heading_line"]
