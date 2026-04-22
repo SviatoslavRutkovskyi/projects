@@ -146,7 +146,6 @@ async function runAction(action) {
         last_resume_json: useLast ? state.lastResumeJson : null,
       };
       const result = await apiCall("POST", "/api/v1/resume/tailor", body);
-      state.parsedJob = result.job_description;
       state.lastResumeJson = result.last_resume_json;
       state.resumePdfUrl = "/api/v1/resume/download/" + result.pdf_blob_name;
       renderResumePdf("/api/v1/resume/download/" + result.pdf_blob_name);
@@ -177,7 +176,6 @@ async function runAction(action) {
             answerBox.textContent = res.answer;
             answerBox.classList.remove("empty");
             answerBox.dataset.answered = "true";
-            state.parsedJob = res.job_description;
           } catch (e) {
             answerBox.textContent = "Error: " + e.message;
           }
@@ -376,7 +374,6 @@ async function answerOne(id) {
     answerBox.textContent = res.answer;
     answerBox.classList.remove("empty");
     answerBox.dataset.answered = "true";
-    state.parsedJob = res.job_description;
   } catch (e) {
     answerBox.textContent = "Error: " + e.message;
     toast(e.message, "error");
